@@ -204,7 +204,8 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 .frame { display: grid; place-items: center; }
 .frame.has-picture { width: 100%; }
 .preview { display: grid; place-items: center; width: 100%; }
-.preview img {
+.preview img,
+.preview video {
   display: block;
   max-width: 100%;
   max-height: 340px;

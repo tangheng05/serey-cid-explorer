@@ -9,6 +9,7 @@ export const SOURCE_URL = 'https://github.com/tangheng05/serey-cid-explorer';
 
 // Bigger downloads ask before starting; bigger files are never kept for a preview.
 export const CONFIRM_ABOVE_BYTES = 100 * 1024 * 1024;
-export const PREVIEW_MAX_BYTES = 25 * 1024 * 1024;
+// Verified bytes up to this size are kept in memory so a picture or video can be shown.
+export const PREVIEW_MAX_BYTES = 200 * 1024 * 1024;
 // Files this small are checked as soon as the page knows where they are; bigger ones wait for a click.
 export const AUTO_VERIFY_MAX_BYTES = 25 * 1024 * 1024;

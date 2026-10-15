@@ -52,6 +52,16 @@ export async function verifyFile(file, expected, opts = {}) {
 }
 
 // Only pictures the browser can show safely; the CID carries no media type.
+// A verified video can be played from the bytes already in memory.
+export function sniffVideo(bytes) {
+  const b = bytes;
+  if (b.length > 12 && String.fromCharCode(...b.slice(4, 8)) === 'ftyp') {
+    return String.fromCharCode(...b.slice(8, 12)) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+  }
+  if (b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'video/webm';
+  return null;
+}
+
 export function sniffImage(bytes) {
   const b = bytes;
   if (b.length > 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';

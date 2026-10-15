@@ -1,6 +1,6 @@
 import { parseCid } from './cid.js';
 import { fetchLocations } from './nodes.js';
-import { verifyUrl, verifyFile, sniffImage } from './verify.js';
+import { verifyUrl, verifyFile, sniffImage, sniffVideo } from './verify.js';
 import { fileSize, shortDuration } from './format.js';
 import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
 
@@ -201,11 +201,14 @@ function resultCard(cid, signal, details) {
     frame.className = `frame is-${kind}`;
     if (kind === 'ok' && kept) {
       const bytes = concat(kept);
-      const type = sniffImage(bytes);
-      if (type) {
-        previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
+      const image = sniffImage(bytes);
+      const video = image ? null : sniffVideo(bytes);
+      if (image || video) {
+        previewUrl = URL.createObjectURL(new Blob([bytes], { type: image || video }));
         frame.classList.add('has-picture');
-        fill(frame, h('div', { class: 'preview' }, h('img', { src: previewUrl, alt: 'The verified file' })));
+        fill(frame, h('div', { class: 'preview' }, image
+          ? h('img', { src: previewUrl, alt: 'The verified file' })
+          : h('video', { src: previewUrl, controls: true, playsinline: true, preload: 'metadata' })));
         return;
       }
     }
@@ -226,7 +229,7 @@ function resultCard(cid, signal, details) {
 
   function idle() {
     if (!looked) setStatus('busy', 'Finding the file', `Asking the ${SEREY_NODE.name} where it is kept.`);
-    else if (source) setStatus('neutral', 'Not verified yet', `This file is ${size}. Download it to check it.`);
+    else if (source) setStatus('neutral', 'Not verified yet', `This file is ${size}. Download and verify it to check it and see a preview.`);
     else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.');
   }
 

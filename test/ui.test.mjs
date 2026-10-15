@@ -106,6 +106,15 @@ test('a small file is checked on its own, proving the bytes and showing a pictur
   await until(() => page.text().includes('No answer'), 'a silent other node is reported, not fatal');
 });
 
+test('a verified video plays from the checked bytes', async () => {
+  const MP4 = Uint8Array.from([0, 0, 0, 0x18, ...'ftypisom'].map((c) => (typeof c === 'string' ? c.charCodeAt(0) : c)).concat(Array.from({ length: 3000 }, (_, i) => (i * 7) % 256)));
+  const cid = cidOf(MP4);
+  const page = await open(cid, network({ serey: location(parseCid(cid).key), garden: 404, blob: MP4 }));
+  await until(() => page.doc.querySelector('.preview video'), 'the video is shown after the check');
+  assert.strictEqual(page.doc.querySelector('.preview video').getAttribute('src'), 'blob:preview');
+  assert.ok(page.text().includes('Verified'));
+});
+
 test('bytes that do not match are called out, with no picture', async () => {
   const cid = cidOf(PNG);
   const tampered = PNG.slice();
