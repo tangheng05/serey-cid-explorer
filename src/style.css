@@ -384,6 +384,10 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 @keyframes pulse { 50% { opacity: .25; } }
 
 
+.expiry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.expiry-note { color: var(--muted); font-size: .84rem; }
+.expiry-note .link { font-size: .84rem; }
+
 .loading { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
 .spinner { width: 16px; height: 16px; border: 2px solid var(--blue-50); border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -450,8 +454,8 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   .badge { font-size: 1.3rem; }
   .row { grid-template-columns: 1fr; gap: 4px; }
   /* Short values sit beside their label; hashes, addresses and comparisons keep a line of their own */
-  .row:not(:has(.copyable, .mono, .cmp)) { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
-  .row:not(:has(.copyable, .mono, .cmp)) > .value { text-align: right; }
+  .row:not(:has(.copyable, .mono, .cmp, .expiry)) { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  .row:not(:has(.copyable, .mono, .cmp, .expiry)) > .value { text-align: right; }
 
   /* The strip becomes a short list: label on the left, value on the right, never cut off */
   .strip { grid-template-columns: 1fr; margin-top: 20px; }

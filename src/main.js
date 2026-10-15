@@ -1,7 +1,7 @@
 import { parseCid } from './cid.js';
 import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile, sniffImage } from './verify.js';
-import { fileSize, relativeTime } from './format.js';
+import { fileSize, shortDuration } from './format.js';
 import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
 
 const input = document.getElementById('cid-input');
@@ -332,7 +332,28 @@ function resultCard(cid, signal, details) {
   };
 }
 
-function locationRows(locations) {
+// A storage location is an offer that lasts a while; the node hands out a fresh one when asked again.
+const EXPIRY_SOON_MS = 5 * 60 * 1000;
+
+function paintExpiry(el) {
+  const left = Number(el.dataset.expiry) * 1000 - Date.now();
+  const at = new Date(Number(el.dataset.expiry) * 1000).toLocaleString();
+  if (left > 0) {
+    const tone = left < EXPIRY_SOON_MS ? 'warn' : 'ok';
+    fill(el, h('span', { class: `pill ${tone}`, title: `Until ${at}` }, h('span', { class: 'pill-dot' }), tone === 'warn' ? `Expires in ${shortDuration(left)}` : `Valid for ${shortDuration(left)}`));
+    return;
+  }
+  fill(
+    el,
+    h('span', { class: 'pill neutral', title: `Ended ${at}` }, h('span', { class: 'pill-dot' }), `Expired ${shortDuration(left)} ago`),
+    h('span', { class: 'expiry-note' }, 'This address may stop working. ', h('button', { type: 'button', class: 'link', onclick: () => el.refresh() }, 'Ask again')),
+  );
+}
+
+// Offers count down while the page is open.
+setInterval(() => document.querySelectorAll('.expiry').forEach(paintExpiry), 30000);
+
+function locationRows(locations, refresh) {
   return locations.map((loc) => h(
     'div',
     { class: 'loc' },
@@ -340,7 +361,12 @@ function locationRows(locations) {
       ? loc.parts.map((url) => row('Address', h('span', { class: 'value copyable' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, url), copyButton(url))))
       : row('Address', 'The node has no https address for it'),
     row('Kind', loc.type),
-    loc.expiry ? row('Offer expires', h('span', { class: 'value', title: new Date(loc.expiry * 1000).toLocaleString() }, relativeTime(loc.expiry))) : null,
+    loc.expiry ? row('Offer', (() => {
+      const el = h('span', { class: 'value expiry', 'data-expiry': String(loc.expiry) });
+      el.refresh = refresh;
+      paintExpiry(el);
+      return el;
+    })()) : null,
     loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
   ));
 }
@@ -360,7 +386,10 @@ async function lookUp(cid, result, details, gen, signal) {
     failure
       ? h('p', { class: 'note' }, `The ${SEREY_NODE.name} did not answer (${failure.message}). Try again in a moment.`)
       : locations.length
-        ? locationRows(locations)
+        ? locationRows(locations, () => {
+          fill(details.storage, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), `Asking the ${SEREY_NODE.name} again...`));
+          lookUp(cid, result, details, gen, signal);
+        })
         : h('p', { class: 'note' }, `The ${SEREY_NODE.name} does not know this file. It may have been deleted, or it was never stored here.`),
   );
   result.located(locations.flatMap((l) => l.parts)[0] || null);

@@ -20,3 +20,12 @@ export function relativeTime(seconds, now = Date.now()) {
   }
   return rtf.format(Math.round(diff / 1000), 'second');
 }
+
+// "42 min", "3 h 5 min", "2 days" for a span of milliseconds.
+export function shortDuration(ms) {
+  const min = Math.max(1, Math.round(Math.abs(ms) / 60000));
+  if (min < 60) return `${min} min`;
+  const hours = Math.floor(min / 60);
+  if (hours < 48) return min % 60 ? `${hours} h ${min % 60} min` : `${hours} h`;
+  return `${Math.round(hours / 24)} days`;
+}

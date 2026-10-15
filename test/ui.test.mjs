@@ -32,6 +32,7 @@ const location = (key, extra = {}) => ({ locations: [{ type: 3, parts: [`https:/
 async function open(hash, net, { path = '' } = {}) {
   const dom = new JSDOM(html, { url: `https://cid.serey.io/${path}${hash ? `#${hash}` : ''}`, runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
+  window.setInterval = () => 0; // the offer countdown would keep the test run alive
   window.fetch = net.fetchFake;
   window.URL.createObjectURL = () => 'blob:preview';
   window.URL.revokeObjectURL = () => {};
@@ -182,6 +183,24 @@ test('nothing a node says can inject markup or an unsafe link', async () => {
   assert.ok(page.text().includes('<img src=x onerror=alert(2)>'), 'the hostile node id is shown as plain text');
   const hrefs = [...page.doc.querySelectorAll('#output .loc a')].map((a) => a.href);
   assert.deepStrictEqual(hrefs, [`https://storage.serey.io/blob/1/${key}`], 'only the https address became a link');
+});
+
+test('an expired storage offer says so and can be asked for again', async () => {
+  const cid = cidOf(PNG);
+  const key = parseCid(cid).key;
+  const net = network({ serey: location(key, { expiry: Math.floor(Date.now() / 1000) - 300 }), garden: 404, blob: PNG });
+  const page = await open(cid, net);
+  await until(() => page.text().includes('Expired 5 min ago'), 'the expired offer is shown');
+  const asked = () => net.calls.filter((u) => u.startsWith('https://s5.serey.io/')).length;
+  const before = asked();
+  page.button('Ask again').click();
+  await until(() => asked() > before, 'the node was asked again');
+});
+
+test('a live storage offer shows how long it lasts', async () => {
+  const cid = cidOf(PNG);
+  const page = await open(cid, network({ serey: location(parseCid(cid).key, { expiry: Math.floor(Date.now() / 1000) + 42 * 60 + 20 }), garden: 404, blob: PNG }));
+  await until(() => page.text().includes('Valid for 42 min'), 'the remaining time is shown');
 });
 
 test('moving to another CID drops the old results', async () => {
