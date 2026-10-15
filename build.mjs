@@ -19,6 +19,8 @@ const options = {
   sourcemap: true,
   target: 'es2020',
   outdir: 'dist',
+  loader: { '.woff2': 'file' },
+  assetNames: 'fonts/[name]-[hash]',
   logLevel: 'info',
 };
 

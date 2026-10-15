@@ -67,7 +67,7 @@ test('a CID in the link opens straight onto its details and storage', async () =
   assert.ok(t.includes('File (raw bytes)') && t.includes(`${PNG.length.toLocaleString('en-US')} bytes`));
   assert.ok(t.includes(parsed.hashHex), 'the hash is shown');
   assert.ok(t.includes('Reported by the Serey S5 node'));
-  const link = page.doc.querySelector('#output a');
+  const link = page.doc.querySelector('#output .loc a');
   assert.strictEqual(link.href, `https://storage.serey.io/blob/1/${parsed.key}`);
   assert.strictEqual(link.rel, 'noopener noreferrer');
   assert.ok(!t.includes('[object'), 'no unrendered nested lists');
@@ -173,7 +173,7 @@ test('nothing a node says can inject markup or an unsafe link', async () => {
   await until(() => page.text().includes('Other S5 nodes') && page.text().includes('Also reports'), 'rendered');
   assert.strictEqual(page.doc.querySelector('#output img'), null, 'no element was injected');
   assert.ok(page.text().includes('<img src=x onerror=alert(2)>'), 'the hostile node id is shown as plain text');
-  const hrefs = [...page.doc.querySelectorAll('#output a')].map((a) => a.href);
+  const hrefs = [...page.doc.querySelectorAll('#output .loc a')].map((a) => a.href);
   assert.deepStrictEqual(hrefs, [`https://storage.serey.io/blob/1/${key}`], 'only the https address became a link');
 });
 
