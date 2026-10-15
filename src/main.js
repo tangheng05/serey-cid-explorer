@@ -284,15 +284,18 @@ function resultCard(cid, signal, details) {
     fileInput.value = '';
   });
 
-  const cell = (art, label, value) => {
+  // Hovering (or tapping) a cell's icon shows one plain sentence about it.
+  const cell = (art, label, value, tip) => {
     const v = h('span', { class: 'cell-value' }, value);
-    return { el: h('div', { class: 'cell' }, h('span', { class: 'cell-icon' }, icon(art)), h('div', { class: 'cell-text' }, h('span', { class: 'cell-label' }, label), v)), v };
+    const help = h('span', { class: 'cell-icon', tabindex: '0', 'aria-label': `${label}: ${tip}` }, icon(art), h('span', { class: 'tip', role: 'tooltip' }, tip));
+    return { el: h('div', { class: 'cell' }, help, h('div', { class: 'cell-text' }, h('span', { class: 'cell-label' }, label), v)), v };
   };
+  const nodeNames = ["Serey's node", ...OTHER_NODES.map((node) => node.name)].join(' and ');
   const cells = {
-    size: cell('database', 'Size', size),
-    stored: cell('server', 'Stored at', '...'),
-    nodes: cell('network', 'S5 nodes', '...'),
-    hash: cell('hash', 'Hash', 'BLAKE3-256'),
+    size: cell('database', 'Size', size, 'How big the file is. The size is part of the ID.'),
+    stored: cell('server', 'Stored at', '...', "The server where Serey's S5 node keeps this file."),
+    nodes: cell('network', 'S5 nodes', '...', `How many of the S5 nodes asked (${nodeNames}) have this file.`),
+    hash: cell('hash', 'Hash', 'BLAKE3-256', 'The method used to fingerprint the file. Change one byte and the fingerprint changes.'),
   };
   const strip = h('div', { class: 'strip' }, Object.values(cells).map((c) => c.el));
 
@@ -309,7 +312,6 @@ function resultCard(cid, signal, details) {
     // How many of the S5 nodes asked know the file, as answers come in.
     nodes(found, asked) {
       cells.nodes.v.textContent = `${found} of ${asked}`;
-      cells.nodes.v.title = `${found} of the ${asked} S5 nodes asked know this file`;
     },
     located(url) {
       looked = true;

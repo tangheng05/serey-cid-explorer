@@ -199,7 +199,7 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* Result: one centered column, picture first, then the verdict and one main action */
-.result { display: flex; flex-direction: column; align-items: center; padding: 32px 28px 26px; text-align: center; }
+.result { overflow: visible; display: flex; flex-direction: column; align-items: center; padding: 32px 28px 26px; text-align: center; }
 
 .frame { display: grid; place-items: center; }
 .frame.has-picture { width: 100%; }
@@ -244,6 +244,42 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 .cell { display: flex; align-items: center; gap: 10px; padding: 12px; min-width: 0; text-align: left; }
 .cell-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; color: var(--blue); background: var(--blue-50); border-radius: 9px; }
 .cell-icon .icon { width: 17px; height: 17px; }
+.cell-icon { position: relative; cursor: help; outline: none; transition: background .15s ease; }
+.cell-icon:hover, .cell-icon:focus-visible { background: #dfe4ff; }
+.tip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: -6px;
+  z-index: 5;
+  width: max-content;
+  max-width: 230px;
+  padding: 8px 11px;
+  color: #fff;
+  background: var(--navy);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(15, 21, 53, .22);
+  font-size: .78rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity .12s ease, transform .12s ease, visibility .12s;
+  pointer-events: none;
+}
+.tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 17px;
+  border: 6px solid transparent;
+  border-top-color: var(--navy);
+}
+.cell-icon:hover .tip, .cell-icon:focus .tip { opacity: 1; visibility: visible; transform: none; }
 .cell-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cell + .cell { border-left: 1px solid var(--line-soft); }
 .cell-label { color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
