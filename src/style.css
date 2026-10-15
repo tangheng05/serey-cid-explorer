@@ -211,7 +211,7 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 21, 53, .06), 0 8px 24px rgba(15, 21, 53, .10);
 }
-.frame-icon { display: grid; place-items: center; width: 72px; height: 72px; color: var(--muted); background: var(--line-soft); border-radius: 50%; }
+.frame-icon { display: grid; place-items: center; width: 72px; height: 72px; color: var(--blue); background: var(--blue-50); border-radius: 50%; }
 .frame-icon .icon { width: 32px; height: 32px; stroke-width: 1.7; }
 .frame.is-busy .frame-icon { color: var(--blue); background: var(--blue-50); animation: pulse 1.2s ease-in-out infinite; }
 .frame.is-ok .frame-icon { color: var(--ok); background: var(--ok-bg); }
@@ -247,22 +247,9 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 .sep { color: var(--muted); }
 .link .icon { display: none; }
 
-/* Details: folded by default; every section uses the same two columns */
-.details-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 28px;
-  color: var(--text-2);
-  font-weight: 650;
-  cursor: pointer;
-  list-style: none;
-}
-.details-toggle::-webkit-details-marker { display: none; }
-.details-toggle:hover { color: var(--navy); background: #fafbfe; }
-.details-toggle .icon { color: var(--muted); transition: transform .15s ease; }
-.details[open] .details-toggle { border-bottom: 1px solid var(--line-soft); }
-.details[open] .details-toggle .icon { transform: rotate(180deg); }
+/* Details: every section uses the same two columns, so values line up down the card */
+.details-head { padding: 18px 28px; border-bottom: 1px solid var(--line-soft); }
+.details-head h2 { font-size: 1rem; font-weight: 700; }
 .sect { padding: 18px 28px 6px; }
 .sect + .sect { border-top: 1px solid var(--line-soft); }
 .sect-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
@@ -405,7 +392,7 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   .steps { flex-direction: column; align-items: flex-start; width: fit-content; margin: 8px auto 0; }
   main { padding: 20px 12px 8px; }
   .result { padding: 24px 16px 20px; }
-  .details-toggle, .sect { padding-left: 16px; padding-right: 16px; }
+  .details-head, .sect { padding-left: 16px; padding-right: 16px; }
   .badge { font-size: 1.3rem; }
   .row { grid-template-columns: 1fr; gap: 4px; }
 }

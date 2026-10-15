@@ -33,12 +33,12 @@ const ICONS = {
   copy: ['M9 9h11v11H9z', 'M5 15H4V4h11v1'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
   x: ['M18 6 6 18', 'M6 6l12 12'],
-  file: ['M14 3H6v18h12V7z', 'M14 3v4h4'],
+  // The file outline from the original cid.one icon (Tabler "file-info").
+  file: ['M14 3v4a1 1 0 0 0 1 1h4', 'M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z', 'M11 14h1v4h1', 'M12 11h.01'],
   shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
   download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 20h14'],
-  chevron: ['M6 9l6 6 6-6'],
 };
 const SVG = 'http://www.w3.org/2000/svg';
 function icon(name) {
@@ -97,7 +97,7 @@ function problemCard(cid) {
   );
 }
 
-// One titled block of the technical details: a small heading, an optional link, then rows.
+// One titled block of the details card: a small heading, an optional link, then rows.
 function section(title, aside, ...body) {
   return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, title), aside), ...body);
 }
@@ -110,9 +110,9 @@ function detailsCard(cid) {
   checkSect.hidden = true;
 
   const el = h(
-    'details',
+    'section',
     { class: 'card details' },
-    h('summary', { class: 'details-toggle' }, h('span', null, 'Technical details'), icon('chevron')),
+    h('header', { class: 'details-head' }, h('h2', null, 'Details')),
     section(
       'File',
       null,
@@ -139,9 +139,6 @@ function detailsCard(cid) {
     el,
     storage,
     others,
-    open() {
-      el.open = true;
-    },
     showCheck(res) {
       fill(
         check,
@@ -235,7 +232,6 @@ function resultCard(cid, signal, details) {
     if (res.ok) setStatus('ok', 'Verified', 'The bytes are exactly the file this ID names.', `${size} · checked ${where}`);
     else {
       setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `${size} · checked ${where}`);
-      details.open();
     }
     showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
     details.showCheck(res);
@@ -254,8 +250,7 @@ function resultCard(cid, signal, details) {
       if (!signal.aborted) {
         setStatus('warn', 'Could not finish the check', e.message || String(e));
         showFrame('failed');
-        details.open();
-      }
+        }
     } finally {
       bar.hidden = true;
       buttons(true);
@@ -342,7 +337,6 @@ async function lookUp(cid, result, details, gen, signal) {
         ? locationRows(locations)
         : h('p', { class: 'note' }, `The ${SEREY_NODE.name} does not know this file. It may have been deleted, or it was never stored here.`),
   );
-  if (!locations.length) details.open();
   result.located(locations.flatMap((l) => l.parts)[0] || null);
 
   const answers = await Promise.all(OTHER_NODES.map(async (node) => {
