@@ -94,14 +94,12 @@ test('typing a CID puts it in the path, so the address can be shared', async () 
   assert.strictEqual(page.window.location.pathname, '/');
 });
 
-test('Download and verify proves the bytes and shows a picture', async () => {
+test('a small file is checked on its own, proving the bytes and showing a picture', async () => {
   const cid = cidOf(PNG);
   const key = parseCid(cid).key;
   const page = await open(cid, network({ serey: location(key), garden: 404, blob: PNG }));
-  await until(() => !page.button('Download and verify').disabled, 'the button enables once a location is known');
 
-  page.button('Download and verify').click();
-  await until(() => page.text().includes('Verified'), 'the check finished');
+  await until(() => page.text().includes('Verified'), 'the check finished without a click');
   assert.ok(page.text().includes('exactly the file this ID names'));
   assert.ok(page.doc.querySelector('.preview img'), 'a verified picture is shown');
   assert.strictEqual(page.doc.querySelector('.preview img').src, 'blob:preview');
@@ -113,9 +111,6 @@ test('bytes that do not match are called out, with no picture', async () => {
   const tampered = PNG.slice();
   tampered[500] ^= 1;
   const page = await open(cid, network({ serey: location(parseCid(cid).key), garden: 404, blob: tampered }));
-  await until(() => !page.button('Download and verify').disabled, 'ready');
-
-  page.button('Download and verify').click();
   await until(() => page.text().includes('do NOT match'), 'a mismatch was reported');
   assert.ok(page.doc.querySelector('.badge.bad'));
   assert.strictEqual(page.doc.querySelector('.preview img'), null, 'never draw bytes that failed the check');
@@ -124,11 +119,22 @@ test('bytes that do not match are called out, with no picture', async () => {
 test('a file server error is a failed check, not a mismatch', async () => {
   const cid = cidOf(PNG);
   const page = await open(cid, network({ serey: location(parseCid(cid).key), garden: 404, blob: 500 }));
-  await until(() => !page.button('Download and verify').disabled, 'ready');
-  page.button('Download and verify').click();
   await until(() => page.text().includes('Could not finish the check'), 'the failure was shown');
   assert.ok(page.text().includes('500'));
   assert.ok(!page.text().includes('do NOT match'));
+
+  await until(() => !page.button('Download and verify').disabled, 'the check can be tried again');
+});
+
+test('a big file waits for a click before anything is downloaded', async () => {
+  const cid = buildRawCid(blake3(PNG), 26 * 1024 * 1024);
+  const key = parseCid(cid).key;
+  const net = network({ serey: location(key), garden: 404, blob: PNG });
+  const page = await open(cid, net);
+  await until(() => !page.button('Download and verify').disabled, 'the button enables once a location is known');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(!net.calls.some((u) => u.startsWith('https://storage.serey.io/')), 'no download started');
+  assert.ok(page.text().includes('Not verified yet'));
 });
 
 test('typing something that is not a CID explains why and asks nobody', async () => {
@@ -171,7 +177,8 @@ test('nothing a node says can inject markup or an unsafe link', async () => {
   };
   const page = await open(cid, network({ serey: hostile, garden: hostile, blob: PNG }));
   await until(() => page.text().includes('Other S5 nodes') && page.text().includes('Also reports'), 'rendered');
-  assert.strictEqual(page.doc.querySelector('#output img'), null, 'no element was injected');
+  const stray = [...page.doc.querySelectorAll('#output img')].filter((img) => !img.closest('.preview'));
+  assert.deepStrictEqual(stray, [], 'no element was injected; the only picture is the verified preview');
   assert.ok(page.text().includes('<img src=x onerror=alert(2)>'), 'the hostile node id is shown as plain text');
   const hrefs = [...page.doc.querySelectorAll('#output .loc a')].map((a) => a.href);
   assert.deepStrictEqual(hrefs, [`https://storage.serey.io/blob/1/${key}`], 'only the https address became a link');

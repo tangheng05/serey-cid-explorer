@@ -2,7 +2,7 @@ import { parseCid } from './cid.js';
 import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile, sniffImage } from './verify.js';
 import { fileSize, relativeTime } from './format.js';
-import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES } from './config.js';
+import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
 
 const input = document.getElementById('cid-input');
 const intro = document.getElementById('intro');
@@ -269,12 +269,14 @@ function verifyCard(cid, signal, setState) {
 
   const keep = cid.size <= PREVIEW_MAX_BYTES ? PREVIEW_MAX_BYTES : 0;
 
+  const downloadAndCheck = () => run('Downloading and checking', async () => {
+    const res = await verifyUrl(source, cid, { signal, keep, onProgress: progress });
+    showResult(res, `the copy at ${new URL(source).host}`);
+  });
+
   download.addEventListener('click', () => {
     if (cid.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${fileSize(cid.size)}. Download it to check it?`)) return;
-    run('Downloading and checking', async () => {
-      const res = await verifyUrl(source, cid, { signal, keep, onProgress: progress });
-      showResult(res, `the copy at ${new URL(source).host}`);
-    });
+    downloadAndCheck();
   });
 
   fileInput.addEventListener('change', () => {
@@ -302,6 +304,7 @@ function verifyCard(cid, signal, setState) {
     setSource(url) {
       source = url;
       buttons(true);
+      if (cid.size <= AUTO_VERIFY_MAX_BYTES) downloadAndCheck();
     },
   };
 }
