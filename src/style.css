@@ -93,7 +93,7 @@ a:hover { text-decoration: underline; }
 .brand { display: flex; align-items: center; gap: 14px; color: var(--navy); }
 .brand:hover { text-decoration: none; }
 .brand img { display: block; height: 34px; width: auto; }
-.title { padding-left: 14px; border-left: 1px solid var(--line); font-weight: 700; font-size: 1rem; letter-spacing: -.01em; }
+.title { padding-left: 14px; border-left: 1px solid var(--line); font-weight: 700; font-size: 1rem; letter-spacing: -.01em; white-space: nowrap; }
 .nav { display: flex; align-items: center; gap: 6px; }
 .nav a {
   display: inline-flex;
@@ -106,7 +106,7 @@ a:hover { text-decoration: underline; }
   border-radius: 9px;
 }
 .nav a:hover { background: var(--line-soft); color: var(--navy); text-decoration: none; }
-.nav-node { border: 1px solid var(--line); font-family: var(--mono); font-weight: 500 !important; font-size: .8rem !important; }
+.nav-node { white-space: nowrap; border: 1px solid var(--line); font-family: var(--mono); font-weight: 500 !important; font-size: .8rem !important; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .18); }
 
 /* Hero */
@@ -412,10 +412,33 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   .result { padding: 24px 16px 20px; }
   .details-head, .sect { padding-left: 16px; padding-right: 16px; }
   .badge { font-size: 1.3rem; }
-  .strip { grid-template-columns: 1fr 1fr; }
-  .cell:nth-child(3) { border-left: 0; }
-  .cell:nth-child(n+3) { border-top: 1px solid var(--line-soft); }
   .row { grid-template-columns: 1fr; gap: 4px; }
+  /* Short values sit beside their label; hashes, addresses and comparisons keep a line of their own */
+  .row:not(:has(.copyable, .mono, .cmp)) { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+  .row:not(:has(.copyable, .mono, .cmp)) > .value { text-align: right; }
+
+  /* The strip becomes a short list: label on the left, value on the right, never cut off */
+  .strip { grid-template-columns: 1fr; margin-top: 20px; }
+  .cell { padding: 10px 14px; }
+  .cell + .cell { border-left: 0; border-top: 1px solid var(--line-soft); }
+  .cell-icon { width: 30px; height: 30px; }
+  .cell-icon .icon { width: 16px; height: 16px; }
+  .cell-text { flex: 1; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+  .cell-label { flex: none; }
+  .cell-value { white-space: normal; overflow-wrap: anywhere; text-align: right; }
+
+  #cid-input { height: 52px; padding: 0 46px 0 44px; font-size: .82rem; }
+  .search-icon { left: 15px; width: 18px; height: 18px; }
+  .state-sub { font-size: .92rem; }
+  .actions { width: 100%; }
+  .actions .btn { flex: 1 1 auto; }
+}
+
+/* Very small phones: keep the header to one line; s5.serey.io stays in the footer and the details */
+@media (max-width: 420px) {
+  .nav { display: none; }
+  .brand { gap: 10px; }
+  .title { padding-left: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
