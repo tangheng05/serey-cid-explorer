@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src https:; base-uri 'none'; form-action 'none'">
+  <title>Serey CID Explorer</title>
+  <meta name="description" content="Look up and verify the content ID (CID) of any file stored on Serey's S5 node.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/style.css?v=__BUILD__">
+  <script type="module" src="/app.js?v=__BUILD__"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="https://serey.io/sereyexplorer/" title="Serey Explorer">
+      <picture>
+        <source media="(prefers-reduced-motion: reduce)" srcset="/serey-logo.png">
+        <img src="/serey-logo.gif" alt="Serey">
+      </picture>
+    </a>
+    <span class="title">CID Explorer</span>
+  </header>
+
+  <main>
+    <label class="visually-hidden" for="cid-input">Content ID</label>
+    <input id="cid-input" type="text" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a CID, like z2H7...">
+
+    <section class="card" id="intro">
+      <h2>What is a CID?</h2>
+      <p>A CID is the address of a file, made from the file itself. Change one byte and the CID changes, so nobody can swap a file behind an ID.</p>
+      <p>Paste the ID shown on a post in the Serey Explorer. This page reads what the ID says, asks Serey's S5 node where the file is kept, and can download it and prove, right in your browser, that its bytes match the ID.</p>
+      <p class="muted">Nothing you paste is sent anywhere except to the S5 nodes that answer where a file lives.</p>
+    </section>
+
+    <div id="output" aria-live="polite"></div>
+  </main>
+
+  <footer>
+    <a href="https://github.com/tangheng05/serey-cid-explorer" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+    <span>Based on the <a href="https://github.com/s5-dev/cid-explorer" target="_blank" rel="noopener noreferrer">S5 CID Explorer</a> by redsolver (MIT)</span>
+  </footer>
+</body>
+</html>

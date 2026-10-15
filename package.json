@@ -1,0 +1,21 @@
+{
+  "name": "serey-cid-explorer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Look up and verify S5 content IDs (CIDs) of files stored by Serey",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node build.mjs --watch",
+    "build": "node build.mjs",
+    "test": "node --test test/",
+    "live": "node scripts/live-check.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^26.1.0"
+  }
+}
