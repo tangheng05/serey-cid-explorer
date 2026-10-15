@@ -38,7 +38,7 @@ const ICONS = {
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
   download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 20h14'],
-  upload: ['M12 20V9', 'M7 14l5-5 5 5', 'M5 4h14'],
+  chevron: ['M6 9l6 6 6-6'],
 };
 const SVG = 'http://www.w3.org/2000/svg';
 function icon(name) {
@@ -97,7 +97,7 @@ function problemCard(cid) {
   );
 }
 
-// One titled block of the details card: a small heading, an optional link, then rows.
+// One titled block of the technical details: a small heading, an optional link, then rows.
 function section(title, aside, ...body) {
   return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, title), aside), ...body);
 }
@@ -110,24 +110,22 @@ function detailsCard(cid) {
   checkSect.hidden = true;
 
   const el = h(
-    'section',
+    'details',
     { class: 'card details' },
-    h('header', { class: 'card-head' }, h('h2', null, 'Details')),
+    h('summary', { class: 'details-toggle' }, h('span', null, 'Technical details'), icon('chevron')),
     section(
-      'Content ID',
+      'File',
       null,
       h(
         'div',
         { class: 'sect-body' },
+        row('Size', `${fileSize(cid.size)} (${cid.size.toLocaleString('en-US')} bytes)`),
+        row('Type', 'File (raw bytes)'),
+        row('Hash function', 'BLAKE3, 256 bit'),
         row('Hash', withCopy(cid.hashHex)),
-        h(
-          'details',
-          { class: 'more' },
-          h('summary', null, 'Other formats'),
-          row('Base58', withCopy(cid.forms.base58)),
-          row('Base32', withCopy(cid.forms.base32)),
-          row('Base64url', withCopy(cid.forms.base64url)),
-        ),
+        row('CID, base58', withCopy(cid.forms.base58)),
+        row('CID, base32', withCopy(cid.forms.base32)),
+        row('CID, base64url', withCopy(cid.forms.base64url)),
       ),
     ),
     section('Storage', external(SEREY_NODE.url, nodeHost, 'sect-link'), storage),
@@ -141,6 +139,9 @@ function detailsCard(cid) {
     el,
     storage,
     others,
+    open() {
+      el.open = true;
+    },
     showCheck(res) {
       fill(
         check,
@@ -152,21 +153,23 @@ function detailsCard(cid) {
   };
 }
 
-function resultCard(cid, text, signal, details) {
+function resultCard(cid, signal, details) {
   let source = null;
   let host = '';
   let looked = false;
   let checked = false;
+  let verified = false;
 
   const frame = h('div', { class: 'frame' });
   const status = h('div', { class: 'status' });
   const barFill = h('div', { class: 'bar-fill' });
-  const pct = h('span', { class: 'bar-pct' }, '0%');
-  const bar = h('div', { class: 'progress' }, h('div', { class: 'bar' }, barFill), pct);
+  const bar = h('div', { class: 'progress', hidden: true }, h('div', { class: 'bar' }, barFill));
   const download = h('button', { type: 'button', class: 'btn primary', disabled: true }, icon('download'), h('span', null, 'Download and verify'));
-  const fileInput = h('input', { type: 'file', hidden: true });
-  const pick = h('label', { class: 'btn' }, icon('upload'), 'Check my own copy', fileInput);
   const open = h('a', { class: 'btn', target: '_blank', rel: 'noopener noreferrer', hidden: true }, icon('out'), 'Open file');
+  const fileInput = h('input', { type: 'file', hidden: true });
+  const pick = h('label', { class: 'link' }, 'Check my own copy', fileInput);
+  const actions = h('div', { class: 'actions' });
+  const links = h('div', { class: 'links' });
 
   const buttons = (on) => {
     download.disabled = !on || !source;
@@ -175,12 +178,21 @@ function resultCard(cid, text, signal, details) {
   };
 
   const progress = (done) => {
-    const p = Math.min(100, (done / Math.max(cid.size, 1)) * 100);
-    barFill.style.width = `${p}%`;
-    pct.textContent = `${Math.floor(p)}%`;
+    barFill.style.width = `${Math.min(100, (done / Math.max(cid.size, 1)) * 100)}%`;
   };
 
-  // The picture frame: the verified image itself, or an icon for every other state.
+  // Before a check, downloading is the main action; after one, opening the file is,
+  // and checking again becomes a quiet link beside "Check my own copy".
+  function arrange() {
+    download.classList.toggle('primary', !checked);
+    download.classList.toggle('link', checked);
+    download.classList.toggle('btn', !checked);
+    open.classList.toggle('primary', verified);
+    fill(actions, checked ? open : [source ? download : null, open]);
+    fill(links, checked ? [download, h('span', { class: 'sep' }, '·')] : null, pick);
+  }
+
+  // The verified picture at its own shape, or an icon for every other state.
   function showFrame(kind, kept) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
@@ -190,48 +202,51 @@ function resultCard(cid, text, signal, details) {
       const type = sniffImage(bytes);
       if (type) {
         previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
+        frame.classList.add('has-picture');
         fill(frame, h('div', { class: 'preview' }, h('img', { src: previewUrl, alt: 'The verified file' })));
         return;
       }
     }
-    const art = { ok: 'shield', bad: 'x', failed: 'alert' }[kind] || 'file';
-    fill(frame, h('span', { class: 'frame-icon' }, icon(art)), h('span', { class: 'frame-note' }, kind === 'ok' ? 'Verified file' : fileSize(cid.size)));
+    const art = { ok: 'shield', bad: 'x', failed: 'alert', busy: 'download' }[kind] || 'file';
+    fill(frame, h('span', { class: 'frame-icon' }, icon(art)));
   }
 
-  function setStatus(tone, title, sub, extra) {
-    const art = { ok: 'shield', bad: 'x', warn: 'alert', busy: 'download', neutral: 'file' }[tone];
+  function setStatus(tone, title, sub, meta) {
     fill(
       status,
-      h(
-        'div',
-        { class: `state-line ${tone}` },
-        h('span', { class: 'state-icon' }, icon(art)),
-        h('div', { class: 'state-text' }, h('div', { class: `badge ${tone}` }, title), sub ? h('p', { class: 'state-sub' }, sub) : null),
-      ),
-      extra,
+      h('div', { class: `badge ${tone}` }, title),
+      sub ? h('p', { class: 'state-sub' }, sub) : null,
+      meta ? h('p', { class: 'state-meta' }, meta) : null,
     );
   }
 
+  const size = fileSize(cid.size);
+
   function idle() {
-    if (!looked) setStatus('busy', 'Finding the file', `Asking the ${SEREY_NODE.name} where it is kept.`);
-    else if (source) setStatus('neutral', 'Not verified yet', `This file is ${fileSize(cid.size)}. Download it to check its bytes against the ID.`);
-    else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.');
+    if (!looked) setStatus('busy', 'Finding the file', null, size);
+    else if (source) setStatus('neutral', 'Not verified yet', `This file is ${size}. Download it to check it.`);
+    else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.', size);
   }
 
-  function finish(res, origin) {
+  function finish(res, where) {
     checked = true;
+    verified = res.ok;
     download.lastChild.textContent = 'Check again';
-    download.classList.remove('primary');
-    if (res.ok) setStatus('ok', 'Verified', `These bytes are exactly the file this ID names. Checked ${origin}.`);
-    else setStatus('bad', 'Does not match', `These bytes do NOT match this ID. Checked ${origin}.`);
+    if (res.ok) setStatus('ok', 'Verified', 'The bytes are exactly the file this ID names.', `${size} · checked ${where}`);
+    else {
+      setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `${size} · checked ${where}`);
+      details.open();
+    }
     showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
     details.showCheck(res);
+    arrange();
   }
 
-  async function run(label, task) {
+  async function run(task) {
     buttons(false);
     progress(0);
-    setStatus('busy', 'Checking', label, bar);
+    bar.hidden = false;
+    setStatus('busy', 'Checking', 'Hashing the file in your browser.', size);
     showFrame('busy');
     try {
       await task();
@@ -239,59 +254,41 @@ function resultCard(cid, text, signal, details) {
       if (!signal.aborted) {
         setStatus('warn', 'Could not finish the check', e.message || String(e));
         showFrame('failed');
+        details.open();
       }
     } finally {
+      bar.hidden = true;
       buttons(true);
     }
   }
 
   const keep = cid.size <= PREVIEW_MAX_BYTES ? PREVIEW_MAX_BYTES : 0;
 
-  const downloadAndCheck = () => run(`Downloading the file from ${host} and hashing it in your browser.`, async () => {
+  const downloadAndCheck = () => run(async () => {
     const res = await verifyUrl(source, cid, { signal, keep, onProgress: progress });
-    finish(res, `the copy at ${host}`);
+    finish(res, host);
   });
 
   download.addEventListener('click', () => {
-    if (cid.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${fileSize(cid.size)}. Download it to check it?`)) return;
+    if (cid.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${size}. Download it to check it?`)) return;
     downloadAndCheck();
   });
 
   fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
-    run(`Hashing ${file.name} in your browser.`, async () => {
+    run(async () => {
       const res = await verifyFile(file, cid, { signal, keep, onProgress: progress });
-      finish(res, `your file, ${file.name}`);
+      finish(res, 'your copy');
     });
     fileInput.value = '';
   });
 
-  const fact = (label, value, sub) => h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value, sub ? h('span', { class: 'fact-sub' }, ` (${sub})`) : null));
-
-  const el = h(
-    'section',
-    { class: 'card result' },
-    frame,
-    h(
-      'div',
-      { class: 'result-main' },
-      h('span', { class: 'eyebrow' }, 'Content ID'),
-      h('div', { class: 'result-cid copyable' }, mono(text), copyButton(text)),
-      status,
-      h(
-        'div',
-        { class: 'facts' },
-        fact('Size', fileSize(cid.size), `${cid.size.toLocaleString('en-US')} bytes`),
-        fact('Type', 'File (raw bytes)'),
-        fact('Algorithm', 'BLAKE3-256'),
-      ),
-      h('div', { class: 'actions' }, download, pick, open),
-    ),
-  );
+  const el = h('section', { class: 'card result' }, frame, status, bar, actions, links);
 
   showFrame('idle');
   idle();
+  arrange();
   buttons(true);
 
   return {
@@ -305,6 +302,7 @@ function resultCard(cid, text, signal, details) {
         open.href = url;
         open.hidden = false;
       }
+      arrange();
       buttons(true);
       if (checked) return;
       if (url && cid.size <= AUTO_VERIFY_MAX_BYTES) downloadAndCheck();
@@ -317,16 +315,11 @@ function locationRows(locations) {
   return locations.map((loc) => h(
     'div',
     { class: 'loc' },
-    row('Location', h(
-      'span',
-      { class: 'value loc-line' },
-      h('strong', null, loc.parts[0] ? new URL(loc.parts[0]).host : 'S5 node'),
-      h('span', { class: 'tag' }, loc.type),
-      loc.expiry ? h('span', { class: 'muted', title: new Date(loc.expiry * 1000).toLocaleString() }, `offer expires ${relativeTime(loc.expiry)}`) : null,
-    )),
     loc.parts.length
       ? loc.parts.map((url) => row('Address', h('span', { class: 'value copyable' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, url), copyButton(url))))
       : row('Address', 'The node has no https address for it'),
+    row('Kind', loc.type),
+    loc.expiry ? row('Offer expires', h('span', { class: 'value', title: new Date(loc.expiry * 1000).toLocaleString() }, relativeTime(loc.expiry))) : null,
     loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
   ));
 }
@@ -346,9 +339,10 @@ async function lookUp(cid, result, details, gen, signal) {
     failure
       ? h('p', { class: 'note' }, `The ${SEREY_NODE.name} did not answer (${failure.message}). Try again in a moment.`)
       : locations.length
-        ? [h('p', { class: 'muted sect-lede' }, `Reported by the ${SEREY_NODE.name}`), locationRows(locations)]
+        ? locationRows(locations)
         : h('p', { class: 'note' }, `The ${SEREY_NODE.name} does not know this file. It may have been deleted, or it was never stored here.`),
   );
+  if (!locations.length) details.open();
   result.located(locations.flatMap((l) => l.parts)[0] || null);
 
   const answers = await Promise.all(OTHER_NODES.map(async (node) => {
@@ -388,7 +382,7 @@ function render(value) {
   }
 
   const details = detailsCard(cid);
-  const result = resultCard(cid, text, controller.signal, details);
+  const result = resultCard(cid, controller.signal, details);
   out.append(result.el, details.el);
   lookUp(cid, result, details, gen, controller.signal);
 }

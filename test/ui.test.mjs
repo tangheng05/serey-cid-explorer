@@ -66,7 +66,6 @@ test('a CID in the link opens straight onto its details and storage', async () =
   const t = page.text();
   assert.ok(t.includes('File (raw bytes)') && t.includes(`${PNG.length.toLocaleString('en-US')} bytes`));
   assert.ok(t.includes(parsed.hashHex), 'the hash is shown');
-  assert.ok(t.includes('Reported by the Serey S5 node'));
   const link = page.doc.querySelector('#output .loc a');
   assert.strictEqual(link.href, `https://storage.serey.io/blob/1/${parsed.key}`);
   assert.strictEqual(link.rel, 'noopener noreferrer');
@@ -80,7 +79,7 @@ test('a CID in the path, as the Serey Explorer links it, opens the same way', as
   const page = await open('', network({ serey: location(parsed.key), garden: location(parsed.key), blob: PNG }), { path: cid });
 
   assert.strictEqual(page.doc.getElementById('cid-input').value, cid);
-  await until(() => page.text().includes('Reported by the Serey S5 node'), 'the Serey node answered');
+  await until(() => page.doc.querySelector('#output .loc'), 'the Serey node answered');
   assert.ok(page.text().includes(parsed.hashHex));
 });
 
@@ -123,7 +122,7 @@ test('a file server error is a failed check, not a mismatch', async () => {
   assert.ok(page.text().includes('500'));
   assert.ok(!page.text().includes('do NOT match'));
 
-  await until(() => !page.button('Download and verify').disabled, 'the check can be tried again');
+  await until(() => page.button('Download and verify') && !page.button('Download and verify').disabled, 'the check can be tried again');
 });
 
 test('a big file waits for a click before anything is downloaded', async () => {
@@ -131,7 +130,7 @@ test('a big file waits for a click before anything is downloaded', async () => {
   const key = parseCid(cid).key;
   const net = network({ serey: location(key), garden: 404, blob: PNG });
   const page = await open(cid, net);
-  await until(() => !page.button('Download and verify').disabled, 'the button enables once a location is known');
+  await until(() => page.button('Download and verify') && !page.button('Download and verify').disabled, 'the button shows once a location is known');
   await new Promise((r) => setTimeout(r, 50));
   assert.ok(!net.calls.some((u) => u.startsWith('https://storage.serey.io/')), 'no download started');
   assert.ok(page.text().includes('Not verified yet'));
@@ -159,7 +158,8 @@ test('the Serey node being down is said plainly and the check can still run from
   const page = await open(cid, network({ serey: 503, garden: 503, blob: PNG }));
   await until(() => page.text().includes('did not answer'), 'the outage was shown');
   assert.ok(page.text().includes('503'));
-  assert.strictEqual(page.button('Download and verify').disabled, true, 'nothing to download from');
+  const download = page.button('Download and verify');
+  assert.ok(!download || download.disabled, 'nothing to download from');
   assert.strictEqual(page.doc.querySelector('input[type=file]').disabled, false, 'a local file can still be checked');
 });
 
@@ -189,7 +189,7 @@ test('moving to another CID drops the old results', async () => {
   const b = new Uint8Array(200).fill(2);
   const net = network({ serey: location(parseCid(cidOf(a)).key), garden: 404, blob: a });
   const page = await open(cidOf(a), net);
-  await until(() => page.text().includes('Reported by'), 'first result');
+  await until(() => page.doc.querySelector('#output .loc'), 'first result');
   page.type(cidOf(b));
   assert.ok(page.text().includes('200 bytes') && !page.text().includes('100 bytes'));
 });
