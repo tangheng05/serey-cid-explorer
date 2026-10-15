@@ -8,7 +8,6 @@ const input = document.getElementById('cid-input');
 const intro = document.getElementById('intro');
 const out = document.getElementById('output');
 const clear = document.getElementById('clear');
-const example = document.getElementById('example');
 
 // Nothing from a node or a file is ever put into the page as HTML: only text and https links.
 function h(tag, props, ...kids) {
@@ -137,15 +136,20 @@ function cidCard(cid, text) {
       { class: 'stats' },
       stat('Type', 'File (raw bytes)'),
       stat('Size', fileSize(cid.size), `${cid.size.toLocaleString('en-US')} bytes`),
-      stat('Hash function', 'BLAKE3', '256 bit'),
+      stat('Algorithm', 'BLAKE3-256'),
     ),
     h(
       'div',
       { class: 'card-body' },
       row('Hash', withCopy(cid.hashHex)),
-      row('As base58', withCopy(cid.forms.base58)),
-      row('As base32', withCopy(cid.forms.base32)),
-      row('As base64url', withCopy(cid.forms.base64url)),
+      h(
+        'details',
+        { class: 'more' },
+        h('summary', null, 'Other formats'),
+        row('Base58', withCopy(cid.forms.base58)),
+        row('Base32', withCopy(cid.forms.base32)),
+        row('Base64url', withCopy(cid.forms.base64url)),
+      ),
     ),
   );
   return { el, setState };
@@ -166,7 +170,7 @@ function locationRows(locations) {
     loc.parts.length
       ? loc.parts.map((url) => row('Address', h('span', { class: 'value copyable' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, url, icon('out')), copyButton(url))))
       : row('Address', 'The node has no https address for it'),
-    loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
+    loc.nodeId ? h('details', { class: 'more' }, h('summary', null, 'Node ID'), mono(loc.nodeId)) : null,
   ));
 }
 
@@ -179,7 +183,7 @@ function verifyCard(cid, signal, setState) {
   const preview = h('div', { class: 'preview' });
   const download = h('button', { type: 'button', class: 'btn primary', disabled: true }, icon('download'), 'Download and verify');
   const fileInput = h('input', { type: 'file', hidden: true });
-  const pick = h('label', { class: 'btn' }, icon('upload'), 'Verify a file from my computer', fileInput);
+  const pick = h('label', { class: 'btn' }, icon('upload'), 'Check my own copy', fileInput);
 
   const buttons = (on) => {
     download.disabled = !on || !source;
@@ -223,12 +227,17 @@ function verifyCard(cid, signal, setState) {
         h(
           'div',
           null,
-          h('div', { class: `badge ${good ? 'ok' : 'bad'}` }, good ? 'Verified: these bytes are exactly the file this ID names' : 'These bytes do NOT match this ID'),
-          h('div', { class: 'result-sub' }, 'Checked: ', origin),
+          h('div', { class: `badge ${good ? 'ok' : 'bad'}` }, good ? 'Verified' : 'Does not match'),
+          h('div', { class: 'result-sub' }, good ? 'These bytes are exactly the file this ID names.' : 'These bytes do NOT match this ID.', ' Checked ', origin, '.'),
         ),
       ),
-      compare('Hash', mono(cid.hashHex), mono(res.gotHashHex), res.gotHashHex === cid.hashHex),
-      compare('Size', h('span', null, `${cid.size.toLocaleString('en-US')} bytes`), h('span', null, `${res.gotBytes.toLocaleString('en-US')} bytes`), res.gotBytes === cid.size),
+      h(
+        'details',
+        { class: 'more', open: !good },
+        h('summary', null, 'Details'),
+        compare('Hash', mono(cid.hashHex), mono(res.gotHashHex), res.gotHashHex === cid.hashHex),
+        compare('Size', h('span', null, `${cid.size.toLocaleString('en-US')} bytes`), h('span', null, `${res.gotBytes.toLocaleString('en-US')} bytes`), res.gotBytes === cid.size),
+      ),
     );
     showPreview(good ? res.kept : null);
   }
@@ -281,8 +290,8 @@ function verifyCard(cid, signal, setState) {
   buttons(true);
   const el = card(
     'Check the bytes',
-    h('span', { class: 'card-note' }, icon('shield'), 'Hashed in your browser'),
-    h('p', { class: 'muted' }, 'Download the file, or pick a copy you have. A node or server is never taken at its word: the hash is computed here and compared with the ID.'),
+    null,
+    h('p', { class: 'muted' }, 'The hash is computed in your browser and compared with the ID.'),
     h('div', { class: 'actions' }, download, pick),
     bar,
     status,
@@ -396,10 +405,6 @@ clear.addEventListener('click', () => {
   input.focus();
 });
 
-example.addEventListener('click', () => {
-  input.value = example.dataset.cid;
-  show(input.value);
-});
 
 window.addEventListener('hashchange', () => {
   const value = fromUrl();

@@ -30,9 +30,8 @@
 
   <section class="hero">
     <div class="hero-in">
-      <p class="eyebrow">S5 content IDs</p>
-      <h1>Look up and verify any file stored by Serey</h1>
-      <p class="lede">Paste a content ID to see what it names, where Serey's S5 node keeps the file, and prove in your browser that the bytes match.</p>
+      <h1>Verify a file on Serey</h1>
+      <p class="lede">Paste a content ID to find the file and check its bytes.</p>
       <div class="search">
         <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
         <label class="visually-hidden" for="cid-input">Content ID</label>
@@ -41,40 +40,16 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
         </button>
       </div>
-      <p class="hint">Try an example: <button id="example" class="link-btn" type="button" data-cid="z2H73jdhLiG99GZ6D9bznDcAThVJNQF2LhGem4ZrQjj8mSVsteE5">z2H73jdhLiG9...8mSVsteE5</button></p>
     </div>
   </section>
 
   <main>
     <section id="intro">
-      <div class="steps">
-        <article class="step">
-          <span class="step-n">1</span>
-          <h2>Read the ID</h2>
-          <p>A CID is the address of a file, made from the file itself. It names the file's size and its BLAKE3 hash, so nobody can swap a file behind an ID.</p>
-        </article>
-        <article class="step">
-          <span class="step-n">2</span>
-          <h2>Find the file</h2>
-          <p>The page asks Serey's S5 node where the file is kept, and asks another S5 node whether it knows the file too.</p>
-        </article>
-        <article class="step">
-          <span class="step-n">3</span>
-          <h2>Prove the bytes</h2>
-          <p>Download the file, or pick a copy you have. Its hash is computed right here in your browser and compared with the ID.</p>
-        </article>
-      </div>
-
-      <aside class="about">
-        <div>
-          <h2>Where Serey files live</h2>
-          <p>Images and videos on Serey posts are stored on Serey's own S5 node. Each post in the Serey Explorer lists the content IDs of its files. Nothing you paste here is sent anywhere except to the S5 nodes that answer where a file lives.</p>
-        </div>
-        <div class="about-links">
-          <a class="btn" href="https://s5.serey.io" target="_blank" rel="noopener noreferrer">Visit s5.serey.io</a>
-          <a class="btn ghost" href="https://serey.io/sereyexplorer/" target="_blank" rel="noopener noreferrer">Open Serey Explorer</a>
-        </div>
-      </aside>
+      <ol class="steps">
+        <li><span class="step-n">1</span>Paste a CID from a Serey post</li>
+        <li><span class="step-n">2</span>See where the file is stored</li>
+        <li><span class="step-n">3</span>Verify its bytes in your browser</li>
+      </ol>
     </section>
 
     <div id="output" aria-live="polite"></div>
@@ -82,14 +57,10 @@
 
   <footer class="foot">
     <div class="foot-in">
-      <div class="foot-brand">
-        <strong>Serey CID Explorer</strong>
-        <span>Based on the <a href="https://github.com/s5-dev/cid-explorer" target="_blank" rel="noopener noreferrer">S5 CID Explorer</a> by redsolver (MIT)</span>
-      </div>
+      <span>Based on the <a href="https://github.com/s5-dev/cid-explorer" target="_blank" rel="noopener noreferrer">S5 CID Explorer</a> (MIT)</span>
       <nav class="foot-links" aria-label="Links">
-        <a href="https://serey.io/sereyexplorer/" target="_blank" rel="noopener noreferrer">Serey Explorer</a>
-        <a href="https://s5.serey.io" target="_blank" rel="noopener noreferrer">S5 node</a>
-        <a href="https://github.com/tangheng05/serey-cid-explorer" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+        <a href="https://s5.serey.io" target="_blank" rel="noopener noreferrer">s5.serey.io</a>
+        <a href="https://github.com/tangheng05/serey-cid-explorer" target="_blank" rel="noopener noreferrer">GitHub</a>
       </nav>
     </div>
   </footer>
