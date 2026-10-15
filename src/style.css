@@ -94,17 +94,6 @@ a:hover { text-decoration: underline; }
 .brand:hover { text-decoration: none; }
 .brand img { display: block; height: 34px; width: auto; }
 .title { padding-left: 14px; border-left: 1px solid var(--line); font-weight: 700; font-size: 1rem; letter-spacing: -.01em; white-space: nowrap; }
-.title-net {
-  margin-left: 6px;
-  padding: 2px 8px;
-  vertical-align: 2px;
-  color: var(--blue);
-  background: var(--blue-50);
-  border-radius: 999px;
-  font-size: .68rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-}
 .nav { display: flex; align-items: center; gap: 6px; }
 .nav a {
   display: inline-flex;
