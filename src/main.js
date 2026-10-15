@@ -34,7 +34,6 @@ const ICONS = {
   check: ['M5 12.5l4.5 4.5L19 7.5'],
   x: ['M18 6 6 18', 'M6 6l12 12'],
   file: ['M14 3H6v18h12V7z', 'M14 3v4h4'],
-  server: ['M4 4h16v6H4z', 'M4 14h16v6H4z', 'M8 7h.01', 'M8 17h.01'],
   shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
@@ -56,12 +55,6 @@ function icon(name) {
 }
 
 const external = (url, text, cls) => h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: cls }, text);
-const card = (title, aside, ...body) => h(
-  'section',
-  { class: 'card' },
-  h('header', { class: 'card-head' }, h('h2', null, title), aside),
-  h('div', { class: 'card-body' }, ...body),
-);
 const mono = (text) => h('code', { class: 'mono' }, text);
 const row = (label, value) => h('div', { class: 'row' }, h('span', { class: 'label' }, label), value instanceof Node ? value : h('span', { class: 'value' }, value));
 const pill = (tone, text) => h('span', { class: `pill ${tone}` }, h('span', { class: 'pill-dot' }), text);
@@ -104,86 +97,76 @@ function problemCard(cid) {
   );
 }
 
-const STATES = {
-  idle: ['neutral', 'Not verified yet'],
-  busy: ['busy', 'Checking'],
-  ok: ['ok', 'Verified'],
-  bad: ['bad', 'Does not match'],
-  failed: ['warn', 'Check failed'],
-};
+// One titled block of the details card: a small heading, an optional link, then rows.
+function section(title, aside, ...body) {
+  return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, title), aside), ...body);
+}
 
-function cidCard(cid, text) {
-  const state = h('span', { class: 'state' });
-  const setState = (key) => {
-    const [tone, label] = STATES[key];
-    fill(state, pill(tone, label));
-  };
-  setState('idle');
+function detailsCard(cid) {
+  const storage = h('div', { class: 'sect-body' }, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), `Asking the ${SEREY_NODE.name}...`));
+  const others = h('div', { class: 'sect-body' }, OTHER_NODES.map((node) => row(node.name, h('span', { class: 'value' }, pill('busy', 'Asking')))));
+  const check = h('div', { class: 'sect-body' });
+  const checkSect = section('Last check', null, check);
+  checkSect.hidden = true;
 
-  const stat = (label, value, sub) => h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label), h('span', { class: 'stat-value' }, value), sub ? h('span', { class: 'stat-sub' }, sub) : null);
   const el = h(
     'section',
-    { class: 'card summary' },
-    h(
-      'div',
-      { class: 'summary-head' },
-      h('div', { class: 'summary-icon' }, icon('file')),
-      h('div', { class: 'summary-id' }, h('span', { class: 'eyebrow' }, 'Content ID'), h('span', { class: 'value copyable' }, mono(text), copyButton(text))),
-      state,
-    ),
-    h(
-      'div',
-      { class: 'stats' },
-      stat('Type', 'File (raw bytes)'),
-      stat('Size', fileSize(cid.size), `${cid.size.toLocaleString('en-US')} bytes`),
-      stat('Algorithm', 'BLAKE3-256'),
-    ),
-    h(
-      'div',
-      { class: 'card-body' },
-      row('Hash', withCopy(cid.hashHex)),
+    { class: 'card details' },
+    h('header', { class: 'card-head' }, h('h2', null, 'Details')),
+    section(
+      'Content ID',
+      null,
       h(
-        'details',
-        { class: 'more' },
-        h('summary', null, 'Other formats'),
-        row('Base58', withCopy(cid.forms.base58)),
-        row('Base32', withCopy(cid.forms.base32)),
-        row('Base64url', withCopy(cid.forms.base64url)),
+        'div',
+        { class: 'sect-body' },
+        row('Hash', withCopy(cid.hashHex)),
+        h(
+          'details',
+          { class: 'more' },
+          h('summary', null, 'Other formats'),
+          row('Base58', withCopy(cid.forms.base58)),
+          row('Base32', withCopy(cid.forms.base32)),
+          row('Base64url', withCopy(cid.forms.base64url)),
+        ),
       ),
     ),
+    section('Storage', external(SEREY_NODE.url, nodeHost, 'sect-link'), storage),
+    section('Other S5 nodes', null, others),
+    checkSect,
   );
-  return { el, setState };
+
+  const compare = (label, expected, got) => row(label, h('span', { class: 'value cmp' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got));
+
+  return {
+    el,
+    storage,
+    others,
+    showCheck(res) {
+      fill(
+        check,
+        compare('Hash', mono(cid.hashHex), mono(res.gotHashHex)),
+        compare('Size', `${cid.size.toLocaleString('en-US')} bytes`, `${res.gotBytes.toLocaleString('en-US')} bytes`),
+      );
+      checkSect.hidden = false;
+    },
+  };
 }
 
-function locationRows(locations) {
-  return locations.map((loc) => h(
-    'div',
-    { class: 'loc' },
-    h(
-      'div',
-      { class: 'loc-head' },
-      h('span', { class: 'loc-icon' }, icon('server')),
-      h('span', { class: 'loc-host' }, loc.parts[0] ? new URL(loc.parts[0]).host : 'S5 node'),
-      h('span', { class: 'tag' }, loc.type),
-      loc.expiry ? h('span', { class: 'loc-exp', title: new Date(loc.expiry * 1000).toLocaleString() }, `Offer expires ${relativeTime(loc.expiry)}`) : null,
-    ),
-    loc.parts.length
-      ? loc.parts.map((url) => row('Address', h('span', { class: 'value copyable' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, url, icon('out')), copyButton(url))))
-      : row('Address', 'The node has no https address for it'),
-    loc.nodeId ? h('details', { class: 'more' }, h('summary', null, 'Node ID'), mono(loc.nodeId)) : null,
-  ));
-}
-
-function verifyCard(cid, signal, setState) {
+function resultCard(cid, text, signal, details) {
   let source = null;
+  let host = '';
+  let looked = false;
+  let checked = false;
+
+  const frame = h('div', { class: 'frame' });
   const status = h('div', { class: 'status' });
   const barFill = h('div', { class: 'bar-fill' });
   const pct = h('span', { class: 'bar-pct' }, '0%');
-  const bar = h('div', { class: 'progress', hidden: true }, h('div', { class: 'bar' }, barFill), pct);
-  const preview = h('div', { class: 'preview' });
-  const download = h('button', { type: 'button', class: 'btn primary', disabled: true }, icon('download'), 'Download and verify');
+  const bar = h('div', { class: 'progress' }, h('div', { class: 'bar' }, barFill), pct);
+  const download = h('button', { type: 'button', class: 'btn primary', disabled: true }, icon('download'), h('span', null, 'Download and verify'));
   const fileInput = h('input', { type: 'file', hidden: true });
   const pick = h('label', { class: 'btn' }, icon('upload'), 'Check my own copy', fileInput);
+  const open = h('a', { class: 'btn', target: '_blank', rel: 'noopener noreferrer', hidden: true }, icon('out'), 'Open file');
 
   const buttons = (on) => {
     download.disabled = !on || !source;
@@ -197,81 +180,76 @@ function verifyCard(cid, signal, setState) {
     pct.textContent = `${Math.floor(p)}%`;
   };
 
-  function showPreview(kept) {
+  // The picture frame: the verified image itself, or an icon for every other state.
+  function showFrame(kind, kept) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
-    preview.replaceChildren();
-    if (!kept) return;
-    const bytes = concat(kept);
-    const type = sniffImage(bytes);
-    if (!type) return;
-    previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
-    preview.append(h('img', { src: previewUrl, alt: 'The verified file' }));
+    frame.className = `frame is-${kind}`;
+    if (kind === 'ok' && kept) {
+      const bytes = concat(kept);
+      const type = sniffImage(bytes);
+      if (type) {
+        previewUrl = URL.createObjectURL(new Blob([bytes], { type }));
+        fill(frame, h('div', { class: 'preview' }, h('img', { src: previewUrl, alt: 'The verified file' })));
+        return;
+      }
+    }
+    const art = { ok: 'shield', bad: 'x', failed: 'alert' }[kind] || 'file';
+    fill(frame, h('span', { class: 'frame-icon' }, icon(art)), h('span', { class: 'frame-note' }, kind === 'ok' ? 'Verified file' : fileSize(cid.size)));
   }
 
-  const compare = (label, expected, got, same) => h(
-    'div',
-    { class: `cmp ${same ? 'same' : 'diff'}` },
-    h('span', { class: 'label' }, label),
-    h('div', { class: 'cmp-vals' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got),
-  );
-
-  function showResult(res, origin) {
-    const good = res.ok;
-    setState(good ? 'ok' : 'bad');
-    status.replaceChildren(
+  function setStatus(tone, title, sub, extra) {
+    const art = { ok: 'shield', bad: 'x', warn: 'alert', busy: 'download', neutral: 'file' }[tone];
+    fill(
+      status,
       h(
         'div',
-        { class: `result ${good ? 'ok' : 'bad'}` },
-        h('span', { class: 'result-icon' }, icon(good ? 'shield' : 'x')),
-        h(
-          'div',
-          null,
-          h('div', { class: `badge ${good ? 'ok' : 'bad'}` }, good ? 'Verified' : 'Does not match'),
-          h('div', { class: 'result-sub' }, good ? 'These bytes are exactly the file this ID names.' : 'These bytes do NOT match this ID.', ' Checked ', origin, '.'),
-        ),
+        { class: `state-line ${tone}` },
+        h('span', { class: 'state-icon' }, icon(art)),
+        h('div', { class: 'state-text' }, h('div', { class: `badge ${tone}` }, title), sub ? h('p', { class: 'state-sub' }, sub) : null),
       ),
-      h(
-        'details',
-        { class: 'more', open: !good },
-        h('summary', null, 'Details'),
-        compare('Hash', mono(cid.hashHex), mono(res.gotHashHex), res.gotHashHex === cid.hashHex),
-        compare('Size', h('span', null, `${cid.size.toLocaleString('en-US')} bytes`), h('span', null, `${res.gotBytes.toLocaleString('en-US')} bytes`), res.gotBytes === cid.size),
-      ),
+      extra,
     );
-    showPreview(good ? res.kept : null);
+  }
+
+  function idle() {
+    if (!looked) setStatus('busy', 'Finding the file', `Asking the ${SEREY_NODE.name} where it is kept.`);
+    else if (source) setStatus('neutral', 'Not verified yet', `This file is ${fileSize(cid.size)}. Download it to check its bytes against the ID.`);
+    else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.');
+  }
+
+  function finish(res, origin) {
+    checked = true;
+    download.lastChild.textContent = 'Check again';
+    download.classList.remove('primary');
+    if (res.ok) setStatus('ok', 'Verified', `These bytes are exactly the file this ID names. Checked ${origin}.`);
+    else setStatus('bad', 'Does not match', `These bytes do NOT match this ID. Checked ${origin}.`);
+    showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
+    details.showCheck(res);
   }
 
   async function run(label, task) {
     buttons(false);
-    setState('busy');
-    status.replaceChildren(h('p', { class: 'muted' }, `${label}...`));
-    showPreview(null);
     progress(0);
-    bar.hidden = false;
+    setStatus('busy', 'Checking', label, bar);
+    showFrame('busy');
     try {
       await task();
     } catch (e) {
       if (!signal.aborted) {
-        setState('failed');
-        status.replaceChildren(h(
-          'div',
-          { class: 'result warn' },
-          h('span', { class: 'result-icon' }, icon('alert')),
-          h('div', null, h('div', { class: 'badge warn' }, 'Could not finish the check'), h('div', { class: 'result-sub' }, e.message || String(e))),
-        ));
+        setStatus('warn', 'Could not finish the check', e.message || String(e));
+        showFrame('failed');
       }
     } finally {
-      bar.hidden = true;
       buttons(true);
     }
   }
 
   const keep = cid.size <= PREVIEW_MAX_BYTES ? PREVIEW_MAX_BYTES : 0;
 
-  const downloadAndCheck = () => run('Downloading and checking', async () => {
+  const downloadAndCheck = () => run(`Downloading the file from ${host} and hashing it in your browser.`, async () => {
     const res = await verifyUrl(source, cid, { signal, keep, onProgress: progress });
-    showResult(res, `the copy at ${new URL(source).host}`);
+    finish(res, `the copy at ${host}`);
   });
 
   download.addEventListener('click', () => {
@@ -282,37 +260,78 @@ function verifyCard(cid, signal, setState) {
   fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
-    run('Reading and checking your file', async () => {
+    run(`Hashing ${file.name} in your browser.`, async () => {
       const res = await verifyFile(file, cid, { signal, keep, onProgress: progress });
-      showResult(res, `your file, ${file.name}`);
+      finish(res, `your file, ${file.name}`);
     });
     fileInput.value = '';
   });
 
-  buttons(true);
-  const el = card(
-    'Check the bytes',
-    null,
-    h('p', { class: 'muted' }, 'The hash is computed in your browser and compared with the ID.'),
-    h('div', { class: 'actions' }, download, pick),
-    bar,
-    status,
-    preview,
+  const fact = (label, value, sub) => h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value, sub ? h('span', { class: 'fact-sub' }, ` (${sub})`) : null));
+
+  const el = h(
+    'section',
+    { class: 'card result' },
+    frame,
+    h(
+      'div',
+      { class: 'result-main' },
+      h('span', { class: 'eyebrow' }, 'Content ID'),
+      h('div', { class: 'result-cid copyable' }, mono(text), copyButton(text)),
+      status,
+      h(
+        'div',
+        { class: 'facts' },
+        fact('Size', fileSize(cid.size), `${cid.size.toLocaleString('en-US')} bytes`),
+        fact('Type', 'File (raw bytes)'),
+        fact('Algorithm', 'BLAKE3-256'),
+      ),
+      h('div', { class: 'actions' }, download, pick, open),
+    ),
   );
+
+  showFrame('idle');
+  idle();
+  buttons(true);
+
   return {
     el,
-    setSource(url) {
+    // Called once the node has answered; a small file is checked straight away.
+    located(url) {
+      looked = true;
       source = url;
+      if (url) {
+        host = new URL(url).host;
+        open.href = url;
+        open.hidden = false;
+      }
       buttons(true);
-      if (cid.size <= AUTO_VERIFY_MAX_BYTES) downloadAndCheck();
+      if (checked) return;
+      if (url && cid.size <= AUTO_VERIFY_MAX_BYTES) downloadAndCheck();
+      else idle();
     },
   };
 }
 
-async function storageCard(cid, where, verify, gen, signal) {
-  const head = h('header', { class: 'card-head' }, h('h2', null, 'Where it is stored'), external(SEREY_NODE.url, nodeHost, 'card-link'));
-  fill(where, head, h('div', { class: 'card-body' }, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), `Asking the ${SEREY_NODE.name}...`)));
+function locationRows(locations) {
+  return locations.map((loc) => h(
+    'div',
+    { class: 'loc' },
+    row('Location', h(
+      'span',
+      { class: 'value loc-line' },
+      h('strong', null, loc.parts[0] ? new URL(loc.parts[0]).host : 'S5 node'),
+      h('span', { class: 'tag' }, loc.type),
+      loc.expiry ? h('span', { class: 'muted', title: new Date(loc.expiry * 1000).toLocaleString() }, `offer expires ${relativeTime(loc.expiry)}`) : null,
+    )),
+    loc.parts.length
+      ? loc.parts.map((url) => row('Address', h('span', { class: 'value copyable' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, url), copyButton(url))))
+      : row('Address', 'The node has no https address for it'),
+    loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
+  ));
+}
 
+async function lookUp(cid, result, details, gen, signal) {
   let locations = [];
   let failure = null;
   try {
@@ -322,20 +341,15 @@ async function storageCard(cid, where, verify, gen, signal) {
   }
   if (gen !== generation) return;
 
-  const parts = locations.flatMap((l) => l.parts);
-  if (parts.length) verify.setSource(parts[0]);
-
-  const body = h('div', { class: 'card-body' });
   fill(
-    body,
+    details.storage,
     failure
       ? h('p', { class: 'note' }, `The ${SEREY_NODE.name} did not answer (${failure.message}). Try again in a moment.`)
       : locations.length
-        ? [h('p', { class: 'muted' }, `Reported by the ${SEREY_NODE.name}`), locationRows(locations)]
+        ? [h('p', { class: 'muted sect-lede' }, `Reported by the ${SEREY_NODE.name}`), locationRows(locations)]
         : h('p', { class: 'note' }, `The ${SEREY_NODE.name} does not know this file. It may have been deleted, or it was never stored here.`),
   );
-  const others = h('div', { class: 'others' }, h('h3', null, 'Other S5 nodes'), OTHER_NODES.map((node) => row(node.name, h('span', { class: 'value' }, h('span', { class: 'pill busy' }, h('span', { class: 'pill-dot' }), 'Asking')))));
-  fill(where, head, body, others);
+  result.located(locations.flatMap((l) => l.parts)[0] || null);
 
   const answers = await Promise.all(OTHER_NODES.map(async (node) => {
     try {
@@ -346,14 +360,10 @@ async function storageCard(cid, where, verify, gen, signal) {
   }));
   if (gen !== generation) return;
 
-  fill(
-    others,
-    h('h3', null, 'Other S5 nodes'),
-    answers.map(({ node, found }) => row(
-      node.name,
-      h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also reports this file') : pill('neutral', 'Does not know this file')),
-    )),
-  );
+  fill(details.others, answers.map(({ node, found }) => row(
+    node.name,
+    h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also reports this file') : pill('neutral', 'Does not know this file')),
+  )));
 }
 
 function render(value) {
@@ -377,11 +387,10 @@ function render(value) {
     return;
   }
 
-  const where = h('section', { class: 'card' });
-  const summary = cidCard(cid, text);
-  const verify = verifyCard(cid, controller.signal, summary.setState);
-  out.append(summary.el, where, verify.el);
-  storageCard(cid, where, verify, gen, controller.signal);
+  const details = detailsCard(cid);
+  const result = resultCard(cid, text, controller.signal, details);
+  out.append(result.el, details.el);
+  lookUp(cid, result, details, gen, controller.signal);
 }
 
 // A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
