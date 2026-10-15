@@ -255,27 +255,29 @@ function render(value) {
   storageCard(cid, where, verify, gen, controller.signal);
 }
 
-function fromHash() {
-  let value = '';
+// A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
+function fromUrl() {
+  const raw = window.location.hash.slice(1) || window.location.pathname.slice(1);
   try {
-    value = decodeURIComponent(window.location.hash.slice(1));
-  } catch { /* an unreadable hash is just empty */ }
-  return value;
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return ''; // an unreadable address is just empty
+  }
 }
 
 input.addEventListener('input', () => {
-  const value = input.value;
-  window.history.replaceState(null, '', value.trim() ? `#${encodeURIComponent(value.trim())}` : window.location.pathname);
-  render(value);
+  const value = input.value.trim();
+  window.history.replaceState(null, '', `/${value ? encodeURIComponent(value) : ''}`);
+  render(input.value);
 });
 
 window.addEventListener('hashchange', () => {
-  const value = fromHash();
+  const value = fromUrl();
   if (value !== input.value.trim()) {
     input.value = value;
     render(value);
   }
 });
 
-input.value = fromHash();
+input.value = fromUrl();
 render(input.value);

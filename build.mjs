@@ -25,7 +25,7 @@ const options = {
 if (watch) {
   const ctx = await context(options);
   await ctx.watch();
-  const { port } = await ctx.serve({ servedir: 'dist', port: 5180 });
+  const { port } = await ctx.serve({ servedir: 'dist', port: 5180, fallback: 'dist/index.html' });
   console.log(`http://localhost:${port}`);
 } else {
   await build(options);

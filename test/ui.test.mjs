@@ -29,8 +29,8 @@ function network({ serey, garden, blob }) {
 
 const location = (key, extra = {}) => ({ locations: [{ type: 3, parts: [`https://storage.serey.io/blob/1/${key}`], expiry: Math.floor(Date.now() / 1000) + 86400 * 3, nodeId: 'z2DXAXfpQUWWjMxxC6nu15PAN2g73pYy3EUVFq3bDddZdSb', score: 1, ...extra }] });
 
-async function open(hash, net) {
-  const dom = new JSDOM(html, { url: `https://cid.serey.io/${hash ? `#${hash}` : ''}`, runScripts: 'outside-only', pretendToBeVisual: true });
+async function open(hash, net, { path = '' } = {}) {
+  const dom = new JSDOM(html, { url: `https://cid.serey.io/${path}${hash ? `#${hash}` : ''}`, runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   window.fetch = net.fetchFake;
   window.URL.createObjectURL = () => 'blob:preview';
@@ -72,6 +72,26 @@ test('a CID in the link opens straight onto its details and storage', async () =
   assert.strictEqual(link.rel, 'noopener noreferrer');
   assert.ok(!t.includes('[object'), 'no unrendered nested lists');
   assert.ok(net.calls.some((u) => u.startsWith(`https://s5.serey.io/s5/debug/storage_locations/${parsed.key}`)));
+});
+
+test('a CID in the path, as the Serey Explorer links it, opens the same way', async () => {
+  const cid = cidOf(PNG);
+  const parsed = parseCid(cid);
+  const page = await open('', network({ serey: location(parsed.key), garden: location(parsed.key), blob: PNG }), { path: cid });
+
+  assert.strictEqual(page.doc.getElementById('cid-input').value, cid);
+  await until(() => page.text().includes('Reported by the Serey S5 node'), 'the Serey node answered');
+  assert.ok(page.text().includes(parsed.hashHex));
+});
+
+test('typing a CID puts it in the path, so the address can be shared', async () => {
+  const cid = cidOf(PNG);
+  const parsed = parseCid(cid);
+  const page = await open('', network({ serey: location(parsed.key), garden: location(parsed.key), blob: PNG }));
+  page.type(cid);
+  assert.strictEqual(page.window.location.pathname, `/${cid}`);
+  page.type('');
+  assert.strictEqual(page.window.location.pathname, '/');
 });
 
 test('Download and verify proves the bytes and shows a picture', async () => {
@@ -126,14 +146,6 @@ test('typing something that is not a CID explains why and asks nobody', async ()
   page.type('');
   assert.strictEqual(page.doc.getElementById('intro').hidden, false, 'clearing brings the explainer back');
   assert.strictEqual(page.text(), '');
-});
-
-test('pasting a CID updates the link so it can be shared', async () => {
-  const cid = cidOf(PNG);
-  const key = parseCid(cid).key;
-  const page = await open('', network({ serey: location(key), garden: 404, blob: PNG }));
-  page.type(cid);
-  assert.strictEqual(page.window.location.hash, `#${cid}`);
 });
 
 test('the Serey node being down is said plainly and the check can still run from a file', async () => {
