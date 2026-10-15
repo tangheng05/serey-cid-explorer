@@ -161,6 +161,8 @@ function resultCard(cid, signal, details) {
   let looked = false;
   let checked = false;
   let verified = false;
+  let streaming = null; // a video playing straight from storage before it is checked
+  let streamTag = null;
 
   const frame = h('div', { class: 'frame' });
   const status = h('div', { class: 'status' });
@@ -195,7 +197,28 @@ function resultCard(cid, signal, details) {
   }
 
   // The verified picture at its own shape, or an icon for every other state.
+  function stopStream() {
+    if (!streaming) return;
+    streaming.pause();
+    streaming.removeAttribute('src');
+    streaming = null;
+  }
+
+  // A large video plays straight from storage, labelled as not verified, while it waits for a check.
+  function tryStream(url) {
+    const video = h('video', { src: url, controls: true, playsinline: true, preload: 'metadata' });
+    video.addEventListener('loadedmetadata', () => {
+      if (checked || !video.videoWidth || source !== url) return;
+      streaming = video;
+      streamTag = h('span', { class: 'preview-tag' }, 'Preview · not verified yet');
+      frame.className = 'frame is-idle has-picture';
+      fill(frame, h('div', { class: 'preview' }, video, streamTag));
+      setStatus('neutral', 'Not verified yet', `This preview streams from ${host}. Download and verify it to check its bytes.`);
+    }, { once: true });
+  }
+
   function showFrame(kind, kept) {
+    stopStream();
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     frame.className = `frame is-${kind}`;
@@ -241,7 +264,12 @@ function resultCard(cid, signal, details) {
     else {
       setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `Checked ${where}`);
     }
-    showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
+    if (res.ok && streaming) {
+      streamTag.textContent = 'Verified';
+      streamTag.classList.add('ok');
+    } else {
+      showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
+    }
     details.showCheck(res);
     arrange();
   }
@@ -251,13 +279,13 @@ function resultCard(cid, signal, details) {
     progress(0);
     bar.hidden = false;
     setStatus('busy', 'Checking', 'Hashing the file in your browser.');
-    showFrame('busy');
+    if (!streaming) showFrame('busy');
     try {
       await task();
     } catch (e) {
       if (!signal.aborted) {
         setStatus('warn', 'Could not finish the check', e.message || String(e));
-        showFrame('failed');
+        if (!streaming) showFrame('failed');
         }
     } finally {
       bar.hidden = true;
@@ -330,7 +358,10 @@ function resultCard(cid, signal, details) {
       buttons(true);
       if (checked) return;
       if (url && cid.size <= AUTO_VERIFY_MAX_BYTES) downloadAndCheck();
-      else idle();
+      else {
+        idle();
+        if (url) tryStream(url);
+      }
     },
   };
 }
