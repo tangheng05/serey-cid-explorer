@@ -35,6 +35,10 @@ const ICONS = {
   x: ['M18 6 6 18', 'M6 6l12 12'],
   // The file outline from the original cid.one icon (Tabler "file-info").
   file: ['M14 3v4a1 1 0 0 0 1 1h4', 'M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z', 'M11 14h1v4h1', 'M12 11h.01'],
+  database: ['M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3z', 'M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6', 'M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'],
+  server: ['M5 4h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M5 14h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z', 'M7 7h.01', 'M7 17h.01'],
+  network: ['M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M12 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M9 6h6', 'M7.5 8.5l3 6.5', 'M16.5 8.5l-3 6.5'],
+  hash: ['M5 9h14', 'M5 15h14', 'M11 4 7 20', 'M17 4l-4 16'],
   shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
@@ -98,15 +102,15 @@ function problemCard(cid) {
 }
 
 // One titled block of the details card: a small heading, an optional link, then rows.
-function section(title, aside, ...body) {
-  return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, title), aside), ...body);
+function section(art, title, aside, ...body) {
+  return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, icon(art), title), aside), ...body);
 }
 
 function detailsCard(cid) {
   const storage = h('div', { class: 'sect-body' }, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), `Asking the ${SEREY_NODE.name}...`));
   const others = h('div', { class: 'sect-body' }, OTHER_NODES.map((node) => row(node.name, h('span', { class: 'value' }, pill('busy', 'Asking')))));
   const check = h('div', { class: 'sect-body' });
-  const checkSect = section('Last check', null, check);
+  const checkSect = section('shield', 'Last check', null, check);
   checkSect.hidden = true;
 
   const el = h(
@@ -114,6 +118,7 @@ function detailsCard(cid) {
     { class: 'card details' },
     h('header', { class: 'details-head' }, h('h2', null, 'Details')),
     section(
+      'file',
       'File',
       null,
       h(
@@ -128,8 +133,8 @@ function detailsCard(cid) {
         row('CID, base64url', withCopy(cid.forms.base64url)),
       ),
     ),
-    section('Storage', external(SEREY_NODE.url, nodeHost, 'sect-link'), storage),
-    section('Other S5 nodes', null, others),
+    section('server', 'Storage', external(SEREY_NODE.url, nodeHost, 'sect-link'), storage),
+    section('network', 'Other S5 nodes', null, others),
     checkSect,
   );
 
@@ -220,18 +225,18 @@ function resultCard(cid, signal, details) {
   const size = fileSize(cid.size);
 
   function idle() {
-    if (!looked) setStatus('busy', 'Finding the file', null, size);
+    if (!looked) setStatus('busy', 'Finding the file', `Asking the ${SEREY_NODE.name} where it is kept.`);
     else if (source) setStatus('neutral', 'Not verified yet', `This file is ${size}. Download it to check it.`);
-    else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.', size);
+    else setStatus('neutral', 'Not verified yet', 'The file was not found online. You can still check a copy you have.');
   }
 
   function finish(res, where) {
     checked = true;
     verified = res.ok;
     download.lastChild.textContent = 'Check again';
-    if (res.ok) setStatus('ok', 'Verified', 'The bytes are exactly the file this ID names.', `${size} · checked ${where}`);
+    if (res.ok) setStatus('ok', 'Verified', 'The bytes are exactly the file this ID names.', `Checked ${where}`);
     else {
-      setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `${size} · checked ${where}`);
+      setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `Checked ${where}`);
     }
     showFrame(res.ok ? 'ok' : 'bad', res.ok ? res.kept : null);
     details.showCheck(res);
@@ -242,7 +247,7 @@ function resultCard(cid, signal, details) {
     buttons(false);
     progress(0);
     bar.hidden = false;
-    setStatus('busy', 'Checking', 'Hashing the file in your browser.', size);
+    setStatus('busy', 'Checking', 'Hashing the file in your browser.');
     showFrame('busy');
     try {
       await task();
@@ -279,7 +284,19 @@ function resultCard(cid, signal, details) {
     fileInput.value = '';
   });
 
-  const el = h('section', { class: 'card result' }, frame, status, bar, actions, links);
+  const cell = (art, label, value) => {
+    const v = h('span', { class: 'cell-value' }, value);
+    return { el: h('div', { class: 'cell' }, h('span', { class: 'cell-icon' }, icon(art)), h('div', { class: 'cell-text' }, h('span', { class: 'cell-label' }, label), v)), v };
+  };
+  const cells = {
+    size: cell('database', 'Size', size),
+    stored: cell('server', 'Stored at', '...'),
+    nodes: cell('network', 'S5 nodes', '...'),
+    hash: cell('hash', 'Hash', 'BLAKE3-256'),
+  };
+  const strip = h('div', { class: 'strip' }, Object.values(cells).map((c) => c.el));
+
+  const el = h('section', { class: 'card result' }, frame, status, bar, strip, actions, links);
 
   showFrame('idle');
   idle();
@@ -289,9 +306,16 @@ function resultCard(cid, signal, details) {
   return {
     el,
     // Called once the node has answered; a small file is checked straight away.
+    // How many of the S5 nodes asked know the file, as answers come in.
+    nodes(found, asked) {
+      cells.nodes.v.textContent = `${found} of ${asked}`;
+      cells.nodes.v.title = `${found} of the ${asked} S5 nodes asked know this file`;
+    },
     located(url) {
       looked = true;
       source = url;
+      cells.stored.v.textContent = url ? new URL(url).host : 'Not found';
+      cells.stored.v.title = cells.stored.v.textContent;
       if (url) {
         host = new URL(url).host;
         open.href = url;
@@ -338,6 +362,8 @@ async function lookUp(cid, result, details, gen, signal) {
         : h('p', { class: 'note' }, `The ${SEREY_NODE.name} does not know this file. It may have been deleted, or it was never stored here.`),
   );
   result.located(locations.flatMap((l) => l.parts)[0] || null);
+  const asked = 1 + OTHER_NODES.length;
+  result.nodes(locations.length ? 1 : 0, asked);
 
   const answers = await Promise.all(OTHER_NODES.map(async (node) => {
     try {
@@ -348,6 +374,7 @@ async function lookUp(cid, result, details, gen, signal) {
   }));
   if (gen !== generation) return;
 
+  result.nodes((locations.length ? 1 : 0) + answers.filter((a) => a.found).length, asked);
   fill(details.others, answers.map(({ node, found }) => row(
     node.name,
     h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also reports this file') : pill('neutral', 'Does not know this file')),
