@@ -1,9 +1,9 @@
 import { parseCid } from './cid.js';
 import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile, sniffImage, sniffVideo } from './verify.js';
-import { fileSize, shortDuration } from './format.js';
+import { fileSize } from './format.js';
 import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
-import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat } from './ui.js';
+import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, paintExpiry } from './ui.js';
 import { parsePostLink, postUrl } from './serey.js';
 import { renderPost, releasePost } from './post.js';
 
@@ -297,24 +297,6 @@ function resultCard(cid, signal, details) {
       }
     },
   };
-}
-
-// A storage location is an offer that lasts a while; the node hands out a fresh one when asked again.
-const EXPIRY_SOON_MS = 5 * 60 * 1000;
-
-function paintExpiry(el) {
-  const left = Number(el.dataset.expiry) * 1000 - Date.now();
-  const at = new Date(Number(el.dataset.expiry) * 1000).toLocaleString();
-  if (left > 0) {
-    const tone = left < EXPIRY_SOON_MS ? 'warn' : 'ok';
-    fill(el, h('span', { class: `pill ${tone}`, title: `Until ${at}` }, h('span', { class: 'pill-dot' }), tone === 'warn' ? `Expires in ${shortDuration(left)}` : `Valid for ${shortDuration(left)}`));
-    return;
-  }
-  fill(
-    el,
-    h('span', { class: 'pill neutral', title: `Ended ${at}` }, h('span', { class: 'pill-dot' }), `Expired ${shortDuration(left)} ago`),
-    h('span', { class: 'expiry-note' }, 'This address may stop working. ', h('button', { type: 'button', class: 'link', onclick: () => el.refresh() }, 'Ask again')),
-  );
 }
 
 // Offers count down while the page is open.

@@ -90,7 +90,24 @@ test('pasting a post link checks every file of the post on one page', async () =
   assert.ok(videoRow.querySelector('.file-status button').textContent.includes('Verify'), 'a big file waits for a click');
   assert.ok(!net.calls.some((u) => u.endsWith(parseCid(video).key) && u.startsWith('https://storage')), 'the big file was not downloaded');
   assert.ok(videoRow.querySelector('.file-thumb img'), 'the video row borrows its verified poster as a thumbnail');
-  assert.strictEqual(page.rows()[0].querySelector('a.file-open').getAttribute('href'), `/${cidOf(a)}`);
+
+  // Details open under the row instead of leaving the page.
+  const first = page.rows()[0];
+  first.querySelector('.file-toggle').click();
+  assert.ok(first.classList.contains('open'));
+  assert.strictEqual(first.querySelector('.file-toggle').getAttribute('aria-expanded'), 'true');
+  const panel = first.querySelector('.file-details').textContent;
+  assert.ok(panel.includes(cidOf(a)), 'the full content ID');
+  assert.ok(panel.includes(parseCid(cidOf(a)).hashHex), 'the hash');
+  assert.ok(panel.includes(`https://storage.serey.io/blob/1/${parseCid(cidOf(a)).key}`), 'where it is stored');
+  assert.ok(panel.includes('Checked hash'), 'the comparison from the check');
+  assert.strictEqual(first.querySelector('.file-details-foot a').getAttribute('href'), `/${cidOf(a)}`);
+  first.querySelector('.file-toggle').click();
+  assert.ok(!first.classList.contains('open'), 'a second click closes it');
+
+  // A big file not checked yet still learns where it is kept when its details open.
+  videoRow.querySelector('.file-toggle').click();
+  await until(() => videoRow.querySelector('.file-details').textContent.includes('Expected') === false && videoRow.querySelector('.file-details a.addr'), 'the address of an unchecked file');
 });
 
 test('a file whose bytes do not match is called out in its row', async () => {

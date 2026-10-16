@@ -1,3 +1,5 @@
+import { shortDuration } from './format.js';
+
 // Small DOM helpers shared by the CID page and the post page.
 
 // Nothing from a node or a file is ever put into the page as HTML: only text and https links.
@@ -34,6 +36,7 @@ export const ICONS = {
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
   out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
   download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 20h14'],
+  chevron: ['M6 9l6 6 6-6'],
   image: ['M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z', 'M4 16l4.5-4.5a1.5 1.5 0 0 1 2 0L16 17', 'M14 14l1.5-1.5a1.5 1.5 0 0 1 2 0L20 15', 'M15 8h.01'],
   play: ['M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.8l-12-7.5A1 1 0 0 0 7 4.5z'],
   music: ['M9 18V6l11-2v12', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M17 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
@@ -77,3 +80,29 @@ export const concat = (chunks) => {
   chunks.forEach((c) => { all.set(c, at); at += c.length; });
   return all;
 };
+
+// A storage location is an offer that lasts a while; the node hands out a fresh one when asked again.
+const EXPIRY_SOON_MS = 5 * 60 * 1000;
+
+export function paintExpiry(el) {
+  const left = Number(el.dataset.expiry) * 1000 - Date.now();
+  const at = new Date(Number(el.dataset.expiry) * 1000).toLocaleString();
+  if (left > 0) {
+    const tone = left < EXPIRY_SOON_MS ? 'warn' : 'ok';
+    fill(el, h('span', { class: `pill ${tone}`, title: `Until ${at}` }, h('span', { class: 'pill-dot' }), tone === 'warn' ? `Expires in ${shortDuration(left)}` : `Valid for ${shortDuration(left)}`));
+    return;
+  }
+  fill(
+    el,
+    h('span', { class: 'pill neutral', title: `Ended ${at}` }, h('span', { class: 'pill-dot' }), `Expired ${shortDuration(left)} ago`),
+    h('span', { class: 'expiry-note' }, 'This address may stop working. ', h('button', { type: 'button', class: 'link', onclick: () => el.refresh() }, 'Ask again')),
+  );
+}
+
+// An offer row: the countdown, with Ask again calling refresh once it has run out.
+export function expiryValue(expiry, refresh) {
+  const el = h('span', { class: 'value expiry', 'data-expiry': String(expiry) });
+  el.refresh = refresh;
+  paintExpiry(el);
+  return el;
+}

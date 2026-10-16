@@ -533,7 +533,7 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 16px;
+  gap: 0 16px;
   padding: 16px 28px;
   animation: fade-up .45s var(--ease) both;
   transition: background .2s ease;
@@ -575,7 +575,25 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 .file-cid .copy { width: 26px; height: 26px; }
 .file-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .file-status { display: flex; align-items: center; gap: 8px; }
-.file-open { font-size: .82rem; }
+.file-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; }
+.file-toggle .icon { display: block; width: 15px; height: 15px; transition: transform .25s var(--ease); }
+.file.open .file-toggle .icon { transform: rotate(180deg); }
+/* The details panel slides open under its row. */
+.file-details { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; transition: grid-template-rows .3s var(--ease); }
+.file.open .file-details { grid-template-rows: 1fr; }
+.file-details-in { min-height: 0; overflow: hidden; }
+.file-details-body {
+  margin-top: 4px;
+  padding: 4px 18px 12px;
+  text-align: left;
+  background: #fafbfe;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+.file-details-body > .row:first-child { border-top: 0; }
+.file-details-foot { display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.file-details-foot .link { display: inline-flex; align-items: center; gap: 5px; font-size: .84rem; }
+.file-details-foot .icon { display: block; width: 14px; height: 14px; }
 .file-reason { margin-top: 6px; color: var(--warn); font-size: .82rem; }
 .file[data-state="bad"] .file-reason { color: var(--bad); }
 .btn.small { padding: 5px 12px; font-size: .8rem; }
@@ -584,7 +602,9 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   .post-head { padding: 22px 16px; }
   .post-title { font-size: 1.2rem; }
   .files-head { padding: 14px 16px; }
-  .file { grid-template-columns: 52px minmax(0, 1fr); gap: 6px 12px; padding: 14px 16px; }
+  .file { grid-template-columns: 52px minmax(0, 1fr); gap: 0 12px; padding: 14px 16px; }
+  .file-side { margin-top: 8px; }
+  .file-details-body { padding: 4px 12px 10px; }
   .file-thumb { width: 52px; height: 52px; border-radius: 10px; }
   .file-side { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
 }

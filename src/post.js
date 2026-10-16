@@ -3,7 +3,7 @@ import { fetchLocations } from './nodes.js';
 import { verifyUrl, sniffImage } from './verify.js';
 import { fileSize } from './format.js';
 import { SEREY_NODE, AUTO_VERIFY_MAX_BYTES, CONFIRM_ABOVE_BYTES } from './config.js';
-import { h, fill, icon, external, mono, pill, copyButton, concat } from './ui.js';
+import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, expiryValue } from './ui.js';
 import { fetchPostMedia, fetchPostTitle, postRows, postUrl, explorerUrl } from './serey.js';
 
 // Pictures up to this size are kept after their check, to show as thumbnails.
@@ -131,6 +131,9 @@ export function renderPost(out, post, { signal, isCurrent }) {
       const status = h('div', { class: 'file-status' });
       const reason = h('div', { class: 'file-reason', hidden: true });
       const sizeText = cid.ok ? fileSize(cid.size) : '';
+      const toggle = h('button', { type: 'button', class: 'link file-toggle', 'aria-expanded': 'false' }, 'Details', icon('chevron'));
+      const panelBody = h('div', { class: 'file-details-body' });
+      const panel = h('div', { class: 'file-details' }, h('div', { class: 'file-details-in' }, panelBody));
       const el = h(
         'article',
         { class: 'file' },
@@ -143,8 +146,62 @@ export function renderPost(out, post, { signal, isCurrent }) {
           h('div', { class: 'file-cid' }, mono(short(r.cid)), copyButton(r.cid)),
           reason,
         ),
-        h('div', { class: 'file-side' }, status, h('a', { class: 'link file-open', href: `/${encodeURIComponent(r.cid)}`, target: '_blank', rel: 'noopener' }, 'Details')),
+        h('div', { class: 'file-side' }, status, toggle),
+        panel,
       );
+
+      // Details open under the row: everything the single-ID page would show about this file.
+      function renderDetails() {
+        if (!el.classList.contains('open')) return;
+        const compare = (label, expected, got) => row(label, h('span', { class: 'value cmp' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got));
+        fill(
+          panelBody,
+          row('Content ID', withCopy(r.cid)),
+          cid.ok ? [
+            row('Size', `${fileSize(cid.size)} (${cid.size.toLocaleString('en-US')} bytes)`),
+            row('Hash function', 'BLAKE3, 256 bit'),
+            row('Hash', withCopy(cid.hashHex)),
+          ] : null,
+          item.url
+            ? row('Address', h('span', { class: 'value copyable' }, h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, item.url), copyButton(item.url)))
+            : row('Address', item.looking ? `Asking the ${SEREY_NODE.name}...` : 'Not known'),
+          item.expiry ? row('Offer', expiryValue(item.expiry, () => lookUp())) : null,
+          item.nodeId ? row('Node ID', mono(item.nodeId)) : null,
+          item.res ? [
+            compare('Checked hash', mono(cid.hashHex), mono(item.res.gotHashHex)),
+            compare('Checked size', `${cid.size.toLocaleString('en-US')} bytes`, `${item.res.gotBytes.toLocaleString('en-US')} bytes`),
+          ] : null,
+          h('div', { class: 'file-details-foot' }, h('a', { class: 'link', href: `/${encodeURIComponent(r.cid)}`, target: '_blank', rel: 'noopener' }, 'Open the full page', icon('out'))),
+        );
+      }
+
+      // Where the file is kept, for a file not checked yet (or to refresh an expired offer).
+      async function lookUp() {
+        if (!cid.ok || item.looking) return;
+        item.looking = true;
+        renderDetails();
+        try {
+          remember(await fetchLocations(SEREY_NODE, cid.key, { signal }));
+        } catch { /* the row's own check reports node trouble */ }
+        item.looking = false;
+        if (isCurrent()) renderDetails();
+      }
+
+      function remember(locations) {
+        const loc = locations.find((l) => l.parts.length);
+        item.url = loc ? loc.parts[0] : null;
+        item.expiry = loc ? loc.expiry : null;
+        item.nodeId = loc ? loc.nodeId : '';
+      }
+
+      toggle.addEventListener('click', () => {
+        const open = !el.classList.contains('open');
+        el.classList.toggle('open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        if (!open) return;
+        renderDetails();
+        if (!item.url && !item.looking && item.state !== 'finding') lookUp();
+      });
 
       const item = {
         el,
@@ -194,6 +251,8 @@ export function renderPost(out, post, { signal, isCurrent }) {
           try {
             item.set('finding');
             const locations = await fetchLocations(SEREY_NODE, cid.key, { signal });
+            remember(locations);
+            renderDetails();
             const url = locations.flatMap((l) => l.parts)[0];
             if (!url) { item.set('missing', null, `The ${SEREY_NODE.name} has no address for this file.`); return; }
             item.set('checking', 0);
@@ -208,6 +267,8 @@ export function renderPost(out, post, { signal, isCurrent }) {
               },
             });
             if (!isCurrent()) return;
+            item.res = res;
+            renderDetails();
             if (!res.ok) { item.set('bad', null, 'The downloaded bytes are not the file this ID names.'); return; }
             item.set('ok');
             if (res.kept) {
