@@ -13,3 +13,6 @@ export const CONFIRM_ABOVE_BYTES = 100 * 1024 * 1024;
 export const PREVIEW_MAX_BYTES = 200 * 1024 * 1024;
 // Files this small are checked as soon as the page knows where they are; bigger ones wait for a click.
 export const AUTO_VERIFY_MAX_BYTES = 25 * 1024 * 1024;
+
+// Serey's API lists the S5 content IDs of a post's files; it must answer cross-origin requests from this site.
+export const SEREY_API = 'https://global-api.serey.io';

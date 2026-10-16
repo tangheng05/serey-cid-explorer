@@ -3,87 +3,16 @@ import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile, sniffImage, sniffVideo } from './verify.js';
 import { fileSize, shortDuration } from './format.js';
 import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
+import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat } from './ui.js';
+import { parsePostLink, postUrl } from './serey.js';
+import { renderPost, releasePost } from './post.js';
 
 const input = document.getElementById('cid-input');
 const intro = document.getElementById('intro');
 const out = document.getElementById('output');
 const clear = document.getElementById('clear');
 
-// Nothing from a node or a file is ever put into the page as HTML: only text and https links.
-function h(tag, props, ...kids) {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
-    if (value === false || value == null) continue;
-    if (key === 'class') node.className = value;
-    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-    else node.setAttribute(key, value === true ? '' : value);
-  }
-  for (const kid of kids.flat(Infinity)) {
-    if (kid != null && kid !== false) node.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return node;
-}
-
-// replaceChildren/append turn an array into text, so lists are flattened first.
-const fill = (parent, ...kids) => parent.replaceChildren(...kids.flat(Infinity).filter(Boolean));
-const add = (parent, ...kids) => parent.append(...kids.flat(Infinity).filter(Boolean));
-
-// Stroke icons, drawn from fixed paths in this file.
-const ICONS = {
-  copy: ['M9 9h11v11H9z', 'M5 15H4V4h11v1'],
-  check: ['M5 12.5l4.5 4.5L19 7.5'],
-  x: ['M18 6 6 18', 'M6 6l12 12'],
-  // The file outline from the original cid.one icon (Tabler "file-info").
-  file: ['M14 3v4a1 1 0 0 0 1 1h4', 'M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z', 'M11 14h1v4h1', 'M12 11h.01'],
-  database: ['M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3z', 'M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6', 'M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'],
-  server: ['M5 4h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M5 14h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z', 'M7 7h.01', 'M7 17h.01'],
-  network: ['M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M12 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M9 6h6', 'M7.5 8.5l3 6.5', 'M16.5 8.5l-3 6.5'],
-  hash: ['M5 9h14', 'M5 15h14', 'M11 4 7 20', 'M17 4l-4 16'],
-  shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
-  alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
-  out: ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v6H4V6h6'],
-  download: ['M12 4v11', 'M7 10l5 5 5-5', 'M5 20h14'],
-};
-const SVG = 'http://www.w3.org/2000/svg';
-function icon(name) {
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.setAttribute('class', `icon icon-${name}`);
-  for (const d of ICONS[name]) {
-    const path = document.createElementNS(SVG, 'path');
-    path.setAttribute('d', d);
-    svg.append(path);
-  }
-  return svg;
-}
-
-const external = (url, text, cls) => h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', class: cls }, text);
-const mono = (text) => h('code', { class: 'mono' }, text);
-const row = (label, value) => h('div', { class: 'row' }, h('span', { class: 'label' }, label), value instanceof Node ? value : h('span', { class: 'value' }, value));
-const pill = (tone, text) => h('span', { class: `pill ${tone}` }, h('span', { class: 'pill-dot' }), text);
 const nodeHost = new URL(SEREY_NODE.url).host;
-
-function copyButton(text) {
-  const button = h('button', { type: 'button', class: 'copy', title: 'Copy', 'aria-label': 'Copy' }, icon('copy'), icon('check'));
-  button.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      button.classList.add('done');
-      button.setAttribute('title', 'Copied');
-      setTimeout(() => { button.classList.remove('done'); button.setAttribute('title', 'Copy'); }, 1400);
-    } catch { /* the text is selectable by hand */ }
-  });
-  return button;
-}
-
-const withCopy = (text) => h('span', { class: 'value copyable' }, mono(text), copyButton(text));
-const concat = (chunks) => {
-  const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
-  let at = 0;
-  chunks.forEach((c) => { all.set(c, at); at += c.length; });
-  return all;
-};
 
 let generation = 0;
 let controller = null;
@@ -457,6 +386,7 @@ function render(value) {
   controller = new AbortController();
   if (previewUrl) URL.revokeObjectURL(previewUrl);
   previewUrl = null;
+  releasePost();
   out.replaceChildren();
 
   const text = value.trim();
@@ -464,6 +394,13 @@ function render(value) {
   clear.hidden = !text;
   document.body.classList.toggle('has-result', Boolean(text));
   if (!text) return;
+
+  // A Serey post link opens the page that checks every file of the post.
+  const post = parsePostLink(text);
+  if (post) {
+    renderPost(out, post, { signal: controller.signal, isCurrent: () => gen === generation });
+    return;
+  }
 
   const cid = parseCid(text);
   if (!cid.ok) {
@@ -493,8 +430,13 @@ document.querySelectorAll('.step').forEach((step) => {
 });
 
 // A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
+// A post opens as cid.serey.io/post/<account>/<permlink>; the box then shows the post's Serey link.
 function fromUrl() {
   const raw = window.location.hash.slice(1) || window.location.pathname.slice(1);
+  if (raw.startsWith('post/')) {
+    const post = parsePostLink(`/${raw}`);
+    return post ? postUrl(post) : '';
+  }
   try {
     return decodeURIComponent(raw).trim();
   } catch {
@@ -504,7 +446,9 @@ function fromUrl() {
 
 function show(value) {
   const text = value.trim();
-  window.history.replaceState(null, '', `/${text ? encodeURIComponent(text) : ''}`);
+  const post = text && parsePostLink(text);
+  const path = post ? `/post/${encodeURIComponent(post.author)}/${encodeURIComponent(post.permlink)}` : `/${text ? encodeURIComponent(text) : ''}`;
+  window.history.replaceState(null, '', path);
   render(value);
 }
 
