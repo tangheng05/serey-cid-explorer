@@ -160,30 +160,28 @@ main { flex: 1; width: 100%; max-width: 940px; margin: 0 auto; padding: 32px 20p
 h2, h3 { margin: 0; letter-spacing: -.01em; }
 .muted { color: var(--muted); }
 
-/* Intro */
+/* Intro: three short steps as small cards */
 .steps {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px 36px;
-  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--text-2);
-  font-size: .92rem;
 }
-.steps li { display: flex; align-items: center; gap: 10px; }
-.step-n {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  color: var(--blue);
-  background: var(--blue-50);
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: .8rem;
+.step {
+  padding: 22px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
+.step-icon { display: grid; place-items: center; width: 40px; height: 40px; color: var(--blue); background: var(--blue-50); border-radius: 11px; }
+.step-icon .icon { width: 20px; height: 20px; }
+.step-n { display: block; margin-top: 16px; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.step h2 { margin: 4px 0 6px; font-size: 1rem; font-weight: 700; color: var(--navy); }
+.step p { margin: 0; color: var(--text-2); font-size: .9rem; line-height: 1.55; }
+.step a { font-weight: 600; }
 
 /* Cards */
 .card {
@@ -464,7 +462,10 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
   .title { padding-left: 10px; font-size: .9rem; }
   .nav a:not(.nav-node) { display: none; }
   .hero-in { padding: 36px 16px 32px; }
-  .steps { flex-direction: column; align-items: flex-start; width: fit-content; margin: 8px auto 0; }
+  .steps { grid-template-columns: 1fr; gap: 10px; }
+  .step { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; padding: 16px; }
+  .step-icon { grid-row: span 3; }
+  .step-n { margin-top: 0; }
   main { padding: 20px 12px 8px; }
   .result { padding: 24px 16px 20px; }
   .details-head, .sect { padding-left: 16px; padding-right: 16px; }
