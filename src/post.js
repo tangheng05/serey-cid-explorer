@@ -99,7 +99,9 @@ export function renderPost(out, post, { signal, isCurrent }) {
       const bad = count('bad');
       const waiting = count('waiting');
       const busy = items.length - ok - bad - waiting - count('failed') - count('missing') - count('invalid');
-      fill(segments, items.map((i) => h('span', { class: `seg ${i.state}` })));
+      // One segment per file, made once; only their colour changes.
+      if (segments.children.length !== items.length) fill(segments, items.map(() => h('span', { class: 'seg' })));
+      items.forEach((i, n) => { segments.children[n].className = `seg ${i.state}`; });
       let text;
       if (busy) text = `Checking files... ${items.length - busy} of ${items.length} done`;
       else if (ok === items.length) text = `All ${items.length} ${items.length === 1 ? 'file' : 'files'} verified`;
@@ -154,10 +156,17 @@ export function renderPost(out, post, { signal, isCurrent }) {
           thumb.classList.add('has-img');
         },
         set(state, pct, why) {
+          // Progress only moves the row's progress line and the number; nothing is rebuilt, so nothing blinks.
+          el.style.setProperty('--p', `${pct || 0}%`);
+          if (state === item.state && state === 'checking' && item.pctText) {
+            item.pctText.textContent = pct == null ? '' : ` ${pct}%`;
+            return;
+          }
           item.state = state;
           el.dataset.state = state;
           reason.hidden = !why;
           reason.textContent = why || '';
+          item.pctText = null;
           const verify = h('button', { type: 'button', class: 'btn small' }, 'Verify');
           verify.addEventListener('click', () => {
             if (item.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${fileSize(item.size)}. Download it to check it?`)) return;
@@ -166,7 +175,10 @@ export function renderPost(out, post, { signal, isCurrent }) {
           const view = {
             queued: pill('neutral', 'Waiting'),
             finding: pill('busy', 'Finding'),
-            checking: pill('busy', pct == null ? 'Checking' : `Checking ${pct}%`),
+            checking: (() => {
+              item.pctText = h('span', { class: 'pct' }, pct == null ? '' : ` ${pct}%`);
+              return pill('busy', ['Checking', item.pctText]);
+            })(),
             ok: pill('ok', 'Verified'),
             bad: pill('bad', 'Does not match'),
             failed: [pill('warn', 'Could not check'), verify],
