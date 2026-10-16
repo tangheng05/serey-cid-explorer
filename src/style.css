@@ -560,6 +560,8 @@ h2, h3 { margin: 0; letter-spacing: -.01em; }
 .file-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .file-status { display: flex; align-items: center; gap: 8px; }
 .file-open { font-size: .82rem; }
+.file-reason { margin-top: 6px; color: var(--warn); font-size: .82rem; }
+.file[data-state="bad"] .file-reason { color: var(--bad); }
 .btn.small { padding: 5px 12px; font-size: .8rem; }
 
 @media (max-width: 600px) {

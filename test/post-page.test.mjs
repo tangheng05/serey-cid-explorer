@@ -129,3 +129,39 @@ test('a CID still opens the single-file page', async () => {
   assert.strictEqual(page.doc.querySelector('.file'), null);
   await until(() => page.doc.querySelector('.result'), 'the single-file result');
 });
+
+test('a file that cannot be downloaded says why and can be tried again', async () => {
+  const a = png(13);
+  const files = { [cidOf(a)]: 503 };
+  const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files }));
+  page.type(POST);
+  await until(() => page.rows()[0] && page.rows()[0].dataset.state === 'failed', 'the failure is shown');
+  assert.ok(page.text().includes('The file server answered 503'), 'the reason is visible, not only on hover');
+  files[cidOf(a)] = a;
+  page.rows()[0].querySelector('.file-status button').click();
+  await until(() => page.rows()[0].dataset.state === 'ok', 'the retry verified the file');
+  assert.ok(page.text().includes('All 1 file verified'));
+});
+
+test('a file the node does not know is marked Not found', async () => {
+  const a = png(13);
+  const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: {} }));
+  page.type(POST);
+  await until(() => page.rows()[0] && page.rows()[0].dataset.state === 'missing', 'the missing file is shown');
+  assert.ok(page.text().includes('Not found'));
+});
+
+test('an unreachable API is explained in words, and titles lose their HTML entities', async () => {
+  const net = network({ media: [], files: {} });
+  const real = net.fetchFake;
+  net.fetchFake = async (url) => { if (String(url).includes('media-proof')) throw new TypeError('Failed to fetch'); return real(url); };
+  const page = await open(net);
+  page.type(POST);
+  await until(() => page.text().includes("Serey's API could not be reached"), 'the reason is in words');
+
+  const a = png(13);
+  const titled = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: { [cidOf(a)]: a }, title: 'Tom &amp; Jerry <b>live</b>' }));
+  titled.type(POST);
+  await until(() => titled.doc.querySelector('.post-title').textContent === 'Tom & Jerry live', 'the title is plain text');
+  assert.strictEqual(titled.doc.querySelector('.post-title b'), null);
+});

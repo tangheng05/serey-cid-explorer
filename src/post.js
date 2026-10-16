@@ -66,7 +66,9 @@ export function renderPost(out, post, { signal, isCurrent }) {
   }).catch((e) => {
     if (!isCurrent()) return;
     summaryText.textContent = 'Could not load this post.';
-    out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('alert')), h('div', null, h('h2', null, 'Could not load the files of this post'), h('p', null, `${e.message || e}. Check the link, or try again in a moment.`))));
+    // A network or cross-origin failure has no status; say so in words.
+    const why = e && e.name === 'TypeError' ? "Serey's API could not be reached from this page" : (e.message || String(e));
+    out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('alert')), h('div', null, h('h2', null, 'Could not load the files of this post'), h('p', null, `${why}. Check the link, or try again in a moment.`))));
   });
 
   function start(rows) {
@@ -103,7 +105,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
       else if (ok === items.length) text = `All ${items.length} ${items.length === 1 ? 'file' : 'files'} verified`;
       else {
         const parts = [`${ok} of ${items.length} verified`];
-        if (bad) parts.push(`${bad} do not match`);
+        if (bad) parts.push(`${bad} ${bad === 1 ? 'does' : 'do'} not match`);
         if (waiting) parts.push(`${waiting} waiting for you`);
         const other = items.length - ok - bad - waiting;
         if (other) parts.push(`${other} could not be checked`);
@@ -125,6 +127,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
       const cid = parseCid(r.cid);
       const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
       const status = h('div', { class: 'file-status' });
+      const reason = h('div', { class: 'file-reason', hidden: true });
       const sizeText = cid.ok ? fileSize(cid.size) : '';
       const el = h(
         'article',
@@ -136,6 +139,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
           h('div', { class: 'file-name' }, h('strong', null, r.label), sizeText ? h('span', { class: 'file-size' }, sizeText) : null),
           h('div', { class: 'file-sub' }, SUB[r.role]),
           h('div', { class: 'file-cid' }, mono(short(r.cid)), copyButton(r.cid)),
+          reason,
         ),
         h('div', { class: 'file-side' }, status, h('a', { class: 'link file-open', href: `/${encodeURIComponent(r.cid)}`, target: '_blank', rel: 'noopener' }, 'Details')),
       );
@@ -149,9 +153,11 @@ export function renderPost(out, post, { signal, isCurrent }) {
           fill(thumb, h('img', { src: url, alt: '' }));
           thumb.classList.add('has-img');
         },
-        set(state, pct) {
+        set(state, pct, why) {
           item.state = state;
           el.dataset.state = state;
+          reason.hidden = !why;
+          reason.textContent = why || '';
           const verify = h('button', { type: 'button', class: 'btn small' }, 'Verify');
           verify.addEventListener('click', () => {
             if (item.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${fileSize(item.size)}. Download it to check it?`)) return;
@@ -172,12 +178,12 @@ export function renderPost(out, post, { signal, isCurrent }) {
           summarize();
         },
         async check() {
-          if (!cid.ok) { item.set('invalid'); return; }
+          if (!cid.ok) { item.set('invalid', null, cid.message); return; }
           try {
             item.set('finding');
             const locations = await fetchLocations(SEREY_NODE, cid.key, { signal });
             const url = locations.flatMap((l) => l.parts)[0];
-            if (!url) { item.set('missing'); return; }
+            if (!url) { item.set('missing', null, `The ${SEREY_NODE.name} has no address for this file.`); return; }
             item.set('checking', 0);
             const keep = r.kind === 'images' && cid.size <= THUMB_MAX_BYTES ? THUMB_MAX_BYTES : 0;
             let last = -1;
@@ -190,7 +196,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
               },
             });
             if (!isCurrent()) return;
-            if (!res.ok) { item.set('bad'); return; }
+            if (!res.ok) { item.set('bad', null, 'The downloaded bytes are not the file this ID names.'); return; }
             item.set('ok');
             if (res.kept) {
               const bytes = concat(res.kept);
@@ -204,12 +210,13 @@ export function renderPost(out, post, { signal, isCurrent }) {
             }
           } catch (e) {
             if (signal.aborted || !isCurrent()) return;
-            item.set('failed');
-            status.title = e.message || String(e);
+            const msg = e && e.name === 'TypeError' ? 'The file could not be downloaded' : (e.message || String(e));
+            if (/ 404$/.test(msg)) item.set('missing', null, `The ${SEREY_NODE.name} does not know this file.`);
+            else item.set('failed', null, `${msg}. Try again.`);
           }
         },
       };
-      if (!cid.ok) item.set('invalid');
+      if (!cid.ok) item.set('invalid', null, cid.message);
       else if (cid.size > AUTO_VERIFY_MAX_BYTES) item.set('waiting');
       return item;
     }

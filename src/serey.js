@@ -64,8 +64,11 @@ export async function fetchPostMedia({ author, permlink }, opts) {
 export async function fetchPostTitle({ author, permlink }, opts) {
   try {
     const body = await getJson(`${SEREY_API}/api/v1/sereyweb/getDetailByPermlink?permlink=${encodeURIComponent(permlink)}&authorName=${encodeURIComponent(author)}`, opts);
-    const title = body && body.content && body.content.title;
-    return typeof title === 'string' && title.trim() ? title.trim() : null;
+    const raw = body && body.content && body.content.title;
+    if (typeof raw !== 'string') return null;
+    // Titles can carry HTML entities (&amp;); only their text is kept. A parsed document runs nothing.
+    const title = new DOMParser().parseFromString(raw, 'text/html').documentElement.textContent.replace(/\s+/g, ' ').trim();
+    return title || null;
   } catch {
     return null;
   }
