@@ -11,11 +11,15 @@ test('Serey post links are recognised in every form', () => {
     'https://serey.io/@chhaylin/why-is-this-important',
     '@chhaylin/why-is-this-important',
     'https://cid.serey.io/post/chhaylin/why-is-this-important',
+    'https://chhay.serey.io/gallery/chhaylin/why-is-this-important',
+    'chhay.serey.io/video/chhaylin/why-is-this-important?t=3',
+    'https://serey.io/blog/chhaylin/why-is-this-important',
   ]) assert.deepStrictEqual(parsePostLink(link), want, link);
 });
 
 test('CIDs and other text are not taken for post links', () => {
-  for (const text of ['z2H73jdhLiG99GZ6D9bznDcAThVJNQF2LhGem4ZrQjj8mSVsteE5', 'hello', 'https://serey.io/authors/x', '@a/b c', '']) {
+  for (const text of ['z2H73jdhLiG99GZ6D9bznDcAThVJNQF2LhGem4ZrQjj8mSVsteE5', 'hello', 'https://serey.io/authors/x', '@a/b c', '',
+    'https://serey.io/sereyexplorer/explorer/@chhaylin', 'https://example.com/gallery/chhaylin/a-post', 'https://serey.io.evil.com/gallery/chhaylin/a-post']) {
     assert.strictEqual(parsePostLink(text), null, text);
   }
 });

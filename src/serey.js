@@ -3,11 +3,17 @@ import { SEREY_API } from './config.js';
 const NAME = /^[a-z0-9][a-z0-9.-]{1,31}$/;
 const PERMLINK = /^[a-z0-9][a-z0-9-]{0,255}$/i;
 
+// Community sites put a section before the post: chhay.serey.io/gallery/<account>/<permlink>, /video/..., and so on.
+const COMMUNITY_POST = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/(?!sereyexplorer\/|api\/)[a-z0-9-]+\/([^/?#\s]+)\/([^/?#\s]+)/i;
+
 // A Serey post named by a link or a short "@account/permlink": serey.io/authors/<account>/<permlink>,
-// any serey link with /@<account>/<permlink>, or this site's own /post/<account>/<permlink>.
+// a community link such as <name>.serey.io/gallery/<account>/<permlink>, any serey link with
+// /@<account>/<permlink>, or this site's own /post/<account>/<permlink>.
 export function parsePostLink(text) {
   const raw = String(text || '').trim();
-  const m = raw.match(/\/(?:authors|post)\/([^/?#\s]+)\/([^/?#\s]+)/) || raw.match(/(?:^|\/)@([^/?#\s]+)\/([^/?#\s]+)/);
+  const m = raw.match(/\/(?:authors|post)\/([^/?#\s]+)\/([^/?#\s]+)/)
+    || raw.match(/(?:^|\/)@([^/?#\s]+)\/([^/?#\s]+)/)
+    || raw.match(COMMUNITY_POST);
   if (!m) return null;
   let author;
   let permlink;
