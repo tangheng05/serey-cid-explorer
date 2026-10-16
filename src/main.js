@@ -240,9 +240,10 @@ function resultCard(cid, signal, details) {
   }
 
   function setStatus(tone, title, sub, meta) {
+    const mark = { ok: 'check', bad: 'x' }[tone];
     fill(
       status,
-      h('div', { class: `badge ${tone}` }, title),
+      h('div', { class: `badge ${tone}` }, mark ? h('span', { class: 'badge-icon' }, icon(mark)) : null, title),
       sub ? h('p', { class: 'state-sub' }, sub) : null,
       meta ? h('p', { class: 'state-meta' }, meta) : null,
     );
@@ -260,6 +261,9 @@ function resultCard(cid, signal, details) {
     checked = true;
     verified = res.ok;
     download.lastChild.textContent = 'Check again';
+    el.classList.remove('is-verified', 'is-mismatch');
+    void el.offsetWidth; // restart the one-off animation on a second check
+    el.classList.add(res.ok ? 'is-verified' : 'is-mismatch');
     if (res.ok) setStatus('ok', 'Verified', 'The bytes are exactly the file this ID names.', `Checked ${where}`);
     else {
       setStatus('bad', 'Does not match', 'These bytes do NOT match this ID.', `Checked ${where}`);
@@ -472,6 +476,21 @@ function render(value) {
   out.append(result.el, details.el);
   lookUp(cid, result, details, gen, controller.signal);
 }
+
+// The header gets a shadow once the page scrolls under it.
+const top = document.querySelector('.top');
+const onScroll = () => top.classList.toggle('scrolled', window.scrollY > 4);
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+
+// A soft light follows the pointer across the step cards.
+document.querySelectorAll('.step').forEach((step) => {
+  step.addEventListener('pointermove', (e) => {
+    const r = step.getBoundingClientRect();
+    step.style.setProperty('--mx', `${e.clientX - r.left}px`);
+    step.style.setProperty('--my', `${e.clientY - r.top}px`);
+  });
+});
 
 // A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
 function fromUrl() {
