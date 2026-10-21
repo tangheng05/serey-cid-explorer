@@ -95,7 +95,7 @@ export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent 
 
     // Small files are checked straight away; a big one waits for a click.
     auto() {
-      if (bytes > AUTO_VERIFY_MAX_BYTES) return copy.set('waiting', `This file is ${fileSize(bytes)}. Check it to download and verify it.`);
+      if (bytes > AUTO_VERIFY_MAX_BYTES) return copy.set('waiting', `${fileSize(bytes)} to download`);
       return copy.check();
     },
 

@@ -155,44 +155,65 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
   // A picture sits beside the verdict; a text gets a full-width panel to be read in.
   const media = isText ? null : h('div', { class: 'media' }, placeholder());
   const reading = isText ? h('div', { class: 'reading' }, h('h3', null, 'The post text'), h('div', { class: 'reading-body' }, placeholder())) : null;
-  const kind = h('p', { class: 'record-kind' });
+  // What the file is, as a small table under the verdict.
+  const typeValue = h('dd');
+  const sizeValue = h('dd');
+  const authorValue = h('dd');
+  const authorFact = h('div', { class: 'fact', hidden: true }, h('dt', null, 'Posted by'), authorValue);
+  let sniffed = '';
   const verdict = h('h2', { class: 'verdict' });
   const verdictSub = h('p', { class: 'verdict-sub' });
   const list = h('div', { class: 'copy-list' });
   const tech = h('div', { class: 'tech-body' });
   const fileInput = h('input', { type: 'file', class: 'visually-hidden' });
-  const copiesBlock = h('div', { class: 'copies' }, h('h3', null, 'Copies'), list);
   const idText = cid ? cid.forms.base58 : fp.hashHex;
+  const facts = h(
+    'dl',
+    { class: 'facts' },
+    h('div', { class: 'fact' }, h('dt', null, 'Type'), typeValue),
+    h('div', { class: 'fact' }, h('dt', null, 'Size'), sizeValue),
+    authorFact,
+    h('div', { class: 'fact' }, h('dt', null, cid ? 'Fingerprint (S5 ID)' : 'Fingerprint (SHA-256)'), h('dd', null, h('span', { class: 'value copyable' }, mono(short(idText)), copyButton(idText)))),
+  );
+  // Checking a file from this device adds it to the copies, so the button sits with them.
+  const copiesBlock = h(
+    'div',
+    { class: 'copies' },
+    h('div', { class: 'copies-head' }, h('h3', null, 'Copies'), h('label', { class: 'btn small' }, icon('shield'), 'Check a copy you have', fileInput)),
+    list,
+  );
 
+  const top = h(
+    'div',
+    { class: isText ? 'record-top is-text' : 'record-top' },
+    media,
+    h(
+      'div',
+      { class: 'record-summary' },
+      verdict,
+      verdictSub,
+      facts,
+      // Beside a picture the copies fill the column next to it; a text needs that room to be read.
+      isText ? null : copiesBlock,
+    ),
+  );
   const record = h(
     'section',
     { class: 'card record' },
-    h(
-      'div',
-      { class: isText ? 'record-top is-text' : 'record-top' },
-      media,
-      h(
-        'div',
-        { class: 'record-summary' },
-        kind,
-        verdict,
-        verdictSub,
-        h(
-          'div',
-          { class: 'fingerprint' },
-          h('span', { class: 'fingerprint-label' }, cid ? 'Fingerprint (S5 ID)' : 'Fingerprint (SHA-256)'),
-          h('span', { class: 'value copyable' }, mono(short(idText)), copyButton(idText)),
-        ),
-        h('label', { class: 'btn' }, icon('shield'), 'Check a copy you have', fileInput),
-        // Beside a picture the copies fill the column next to it; a text needs that room to be read.
-        isText ? null : copiesBlock,
-      ),
-    ),
+    top,
     reading,
     isText ? copiesBlock : null,
     h('details', { class: 'tech' }, h('summary', null, 'Technical details', icon('chevron')), tech),
   );
   out.append(record);
+
+  // A file that will never be previewed gives its space to the summary.
+  const dropMedia = () => {
+    if (!media || !media.isConnected) return;
+    media.remove();
+    top.classList.add('no-media');
+  };
+  if (!isText && !keep) dropMedia();
 
   const copies = [];
   function addCopy(copy, before) {
@@ -227,7 +248,10 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
     if (!res.kept) return;
     const bytes = concat(res.kept);
     const type = sniffImage(bytes) || sniffVideo(bytes);
-    if (!type) return;
+    if (!type) {
+      dropMedia();
+      return;
+    }
     previewed = true;
     const src = URL.createObjectURL(new Blob([bytes], { type }));
     blobUrls.push(src);
@@ -235,12 +259,16 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
     fill(media, h('div', { class: 'preview' }, type.startsWith('image/')
       ? h('img', { src, alt: 'The verified file' })
       : h('video', { src, controls: true, playsinline: true, preload: 'metadata' })));
-    if (!tx) kind.textContent = `${type.startsWith('image/') ? 'Image' : 'Video'}, ${fileSize(fp.size)}`;
+    sniffed = type;
+    paint();
   }
 
   function paint() {
     const author = tagOf(tx, 'Serey-Author');
-    if (!previewed || tx) kind.textContent = [kindName(tx ? tx.type : '', isText), size ? fileSize(size) : '', author ? `by @${author}` : ''].filter(Boolean).join(', ');
+    typeValue.textContent = kindName((tx && tx.type) || sniffed, isText);
+    sizeValue.textContent = size ? fileSize(size) : 'Unknown';
+    authorValue.textContent = author ? `@${author}` : '';
+    authorFact.hidden = !author;
 
     const real = copies.filter((c) => c.state !== 'none');
     const names = (list2) => list2.map((c) => PLACES[c.place].name).join(' and ');

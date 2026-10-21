@@ -193,7 +193,8 @@ test('an Arweave ID opens the same record, marked as the copy you pasted', async
   assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Arweave ID');
   await until(() => page.text().includes('Intact in both copies'), 'both copies verified');
   assert.ok(page.copy('arweave').textContent.includes('You pasted this'));
-  assert.ok(page.text().includes(`Image, ${fileSize(PNG.length)}, by @chhaylin`));
+  const facts = [...page.doc.querySelectorAll('.fact')].filter((f) => !f.hidden).map((f) => `${f.querySelector('dt').textContent}: ${f.querySelector('dd').textContent}`);
+  assert.deepStrictEqual(facts.slice(0, 3), ['Type: Image', `Size: ${fileSize(PNG.length)}`, 'Posted by: @chhaylin']);
   assert.ok(page.text().includes("Serey's wallet"));
 });
 

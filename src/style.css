@@ -149,12 +149,8 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .media.has-preview { min-height: 0; background: none; border: 0; border-radius: 0; }
 .preview { display: grid; place-items: center; width: 100%; }
 .preview img, .preview video { display: block; max-width: 100%; max-height: 440px; border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 21, 53, .08), 0 8px 24px rgba(15, 21, 53, .10); }
-/* A text: the verdict runs across the top, its fingerprint and check to the right */
+/* A text: the summary runs across the top, the text below it */
 .record-top.is-text { grid-template-columns: minmax(0, 1fr); }
-.record-top.is-text .record-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 32px; align-items: center; }
-.record-top.is-text .record-summary > :not(.fingerprint):not(.btn) { grid-column: 1; }
-.record-top.is-text .fingerprint { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin: 0; }
-.record-top.is-text .record-summary > .btn { grid-column: 2; grid-row: 3; justify-self: stretch; }
 
 /* A post text, set for reading */
 .reading { padding: 0 26px 22px; }
@@ -174,7 +170,6 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .doc-toggle { display: flex; width: 100%; max-width: 68ch; margin: 12px auto 0; }
 
 .record-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
-.record-kind { color: var(--muted); font-size: .9rem; font-weight: 500; }
 .verdict { display: flex; align-items: center; gap: 10px; font-size: 1.5rem; line-height: 1.2; font-weight: 750; letter-spacing: -.02em; color: var(--navy); }
 .verdict.ok { color: var(--ok); }
 .verdict.bad { color: var(--bad); }
@@ -184,13 +179,23 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .verdict.bad .verdict-icon { background: var(--bad); }
 .verdict-icon .icon { width: 16px; height: 16px; stroke-width: 2.6; }
 .verdict-sub { max-width: 60ch; color: var(--ink-2); }
-.fingerprint { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; }
-.fingerprint-label { display: block; color: var(--muted); font-size: .8rem; }
+/* What the file is: labels on the left, values on the right */
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-self: stretch; margin-top: 6px; padding: 4px 16px; background: var(--paper); border-radius: 12px; }
+.fact { display: contents; }
+.fact dt { padding: 9px 24px 9px 0; color: var(--muted); font-size: .86rem; }
+.fact dd { display: flex; align-items: center; min-width: 0; padding: 9px 0; color: var(--ink); font-size: .92rem; }
+.fact + .fact dt, .fact + .fact dd { border-top: 1px solid var(--line-soft); }
+.fact[hidden] + .fact dt, .fact[hidden] + .fact dd { border-top: 1px solid var(--line-soft); }
+.copies-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; }
+.copies .copies-head h3 { margin: 0; }
 
 /* Copies: one row per place, each in its own colour */
 .copies { padding: 4px 26px 22px; }
 .record-summary .copies { align-self: stretch; margin-top: 14px; padding: 18px 0 0; border-top: 1px solid var(--line-soft); }
-.record-summary .copy-row { grid-template-columns: minmax(0, 140px) minmax(0, 1fr) auto; padding: 10px 12px; }
+.record-top.no-media { grid-template-columns: minmax(0, 1fr); }
+/* Beside a picture the column is narrow: a copy's buttons go under its status */
+.record-top:not(.no-media) .record-summary .copy-row { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); padding: 10px 12px; }
+.record-top:not(.no-media) .record-summary .copy-actions { grid-column: 2; }
 .copies h3, .tech summary { font-size: 1rem; font-weight: 700; color: var(--navy); }
 .copies h3 { margin-bottom: 10px; }
 .copy-list { display: grid; gap: 10px; }
@@ -359,13 +364,16 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
   .step-n { margin-top: 0; }
   .record-top { grid-template-columns: 1fr; gap: 20px; padding: 18px; }
   .media { min-height: 160px; }
-  .record-top.is-text .record-summary { display: flex; align-items: flex-start; }
-  .record-top.is-text .fingerprint { align-self: flex-start; }
   .reading { padding: 0 18px 18px; }
   .reading-body { padding: 18px; }
   .copies { padding: 4px 18px 18px; }
   .copy-row, .record-summary .copy-row { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
   .copy-state, .copy-actions { grid-column: 1 / -1; }
+  .record-top:not(.no-media) .record-summary .copy-actions { grid-column: 1 / -1; }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+  .fact dt { padding: 10px 0 0; }
+  .fact dd { padding: 2px 0 10px; }
+  .fact + .fact dd { border-top: 0; }
   .tech summary { padding: 14px 18px; }
   .tech-body { padding: 0 18px 12px; }
   .row { grid-template-columns: 1fr; gap: 2px; }
