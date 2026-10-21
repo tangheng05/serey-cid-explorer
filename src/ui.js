@@ -73,6 +73,18 @@ export function copyButton(text) {
   return button;
 }
 
+// One titled block of the details card: a small heading, an optional link, then rows.
+export function section(art, title, aside, ...body) {
+  return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, icon(art), title), aside), ...body);
+}
+
+// A strip cell; hovering (or tapping) its icon shows one plain sentence about it.
+export const cell = (art, label, value, tip) => {
+  const v = h('span', { class: 'cell-value' }, value);
+  const help = h('span', { class: 'cell-icon', tabindex: '0', 'aria-label': `${label}: ${tip}` }, icon(art), h('span', { class: 'tip', role: 'tooltip' }, tip));
+  return { el: h('div', { class: 'cell' }, help, h('div', { class: 'cell-text' }, h('span', { class: 'cell-label' }, label), v)), v };
+};
+
 export const withCopy = (text) => h('span', { class: 'value copyable' }, mono(text), copyButton(text));
 export const concat = (chunks) => {
   const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));

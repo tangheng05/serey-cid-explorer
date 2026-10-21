@@ -1,4 +1,5 @@
 import { SEREY_API } from './config.js';
+import { parseArweaveId } from './arweave.js';
 
 const NAME = /^[a-z0-9][a-z0-9.-]{1,31}$/;
 const PERMLINK = /^[a-z0-9][a-z0-9-]{0,255}$/i;
@@ -66,17 +67,17 @@ export async function fetchPostMedia({ author, permlink }, opts) {
   return Array.isArray(body && body.media) ? body.media : [];
 }
 
-// The post's title, or null; it only labels the page.
-export async function fetchPostTitle({ author, permlink }, opts) {
+// The post's title and the Arweave ID of its text (null when it has none); they only label the page.
+export async function fetchPostInfo({ author, permlink }, opts) {
   try {
     const body = await getJson(`${SEREY_API}/api/v1/sereyweb/getDetailByPermlink?permlink=${encodeURIComponent(permlink)}&authorName=${encodeURIComponent(author)}`, opts);
     const raw = body && body.content && body.content.title;
-    if (typeof raw !== 'string') return null;
     // Titles can carry HTML entities (&amp;); only their text is kept. A parsed document runs nothing.
-    const title = new DOMParser().parseFromString(raw, 'text/html').documentElement.textContent.replace(/\s+/g, ' ').trim();
-    return title || null;
+    const title = typeof raw === 'string' ? new DOMParser().parseFromString(raw, 'text/html').documentElement.textContent.replace(/\s+/g, ' ').trim() : '';
+    const doc = body && body.forever && body.forever.document;
+    return { title: title || null, textArweave: parseArweaveId(doc && doc.arweave_id) };
   } catch {
-    return null;
+    return { title: null, textArweave: null };
   }
 }
 

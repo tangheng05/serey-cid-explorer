@@ -3,8 +3,10 @@ import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile, sniffImage, sniffVideo } from './verify.js';
 import { fileSize } from './format.js';
 import { SEREY_NODE, OTHER_NODES, CONFIRM_ABOVE_BYTES, PREVIEW_MAX_BYTES, AUTO_VERIFY_MAX_BYTES } from './config.js';
-import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, paintExpiry } from './ui.js';
+import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, paintExpiry, section, cell } from './ui.js';
 import { parsePostLink, postUrl } from './serey.js';
+import { parseArweaveId, findCopies } from './arweave.js';
+import { renderArweave } from './arweave-page.js';
 import { renderPost, releasePost } from './post.js';
 
 const input = document.getElementById('cid-input');
@@ -30,14 +32,10 @@ function problemCard(cid) {
   );
 }
 
-// One titled block of the details card: a small heading, an optional link, then rows.
-function section(art, title, aside, ...body) {
-  return h('section', { class: 'sect' }, h('div', { class: 'sect-head' }, h('h3', null, icon(art), title), aside), ...body);
-}
-
 function detailsCard(cid) {
   const storage = h('div', { class: 'sect-body' }, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), `Asking the ${SEREY_NODE.name}...`));
   const others = h('div', { class: 'sect-body' }, OTHER_NODES.map((node) => row(node.name, h('span', { class: 'value' }, pill('busy', 'Asking')))));
+  const arweave = h('div', { class: 'sect-body' }, h('p', { class: 'muted loading' }, h('span', { class: 'spinner' }), 'Asking Arweave...'));
   const check = h('div', { class: 'sect-body' });
   const checkSect = section('shield', 'Last check', null, check);
   checkSect.hidden = true;
@@ -64,6 +62,7 @@ function detailsCard(cid) {
     ),
     section('server', 'Storage', external(SEREY_NODE.url, nodeHost, 'sect-link'), storage),
     section('network', 'Other S5 nodes', null, others),
+    section('database', 'Arweave', null, arweave),
     checkSect,
   );
 
@@ -73,6 +72,7 @@ function detailsCard(cid) {
     el,
     storage,
     others,
+    arweave,
     showCheck(res) {
       fill(
         check,
@@ -248,12 +248,6 @@ function resultCard(cid, signal, details) {
     fileInput.value = '';
   });
 
-  // Hovering (or tapping) a cell's icon shows one plain sentence about it.
-  const cell = (art, label, value, tip) => {
-    const v = h('span', { class: 'cell-value' }, value);
-    const help = h('span', { class: 'cell-icon', tabindex: '0', 'aria-label': `${label}: ${tip}` }, icon(art), h('span', { class: 'tip', role: 'tooltip' }, tip));
-    return { el: h('div', { class: 'cell' }, help, h('div', { class: 'cell-text' }, h('span', { class: 'cell-label' }, label), v)), v };
-  };
   const nodeNames = ["Serey's node", ...OTHER_NODES.map((node) => node.name)].join(' and ');
   const cells = {
     size: cell('database', 'Size', size, 'How big the file is. The size is part of the ID.'),
@@ -361,6 +355,25 @@ async function lookUp(cid, result, details, gen, signal) {
   )));
 }
 
+async function lookUpArweave(cid, details, gen, signal) {
+  let ids = [];
+  let failure = null;
+  try {
+    ids = (await findCopies([cid.forms.base58], { signal }))[cid.forms.base58] || [];
+  } catch (e) {
+    failure = e;
+  }
+  if (gen !== generation) return;
+  fill(
+    details.arweave,
+    failure
+      ? h('p', { class: 'note' }, `Arweave did not answer (${failure.message}). Try again in a moment.`)
+      : ids.length
+        ? ids.map((id) => row('Copy', h('span', { class: 'value copyable' }, h('a', { class: 'addr', href: `/${id}` }, id), copyButton(id))))
+        : h('p', { class: 'muted' }, 'No Arweave copy found. Only files kept with Forever are copied there.'),
+  );
+}
+
 function render(value) {
   generation += 1;
   const gen = generation;
@@ -384,6 +397,12 @@ function render(value) {
     return;
   }
 
+  const arweaveId = parseArweaveId(text);
+  if (arweaveId) {
+    renderArweave(out, arweaveId, { signal: controller.signal, isCurrent: () => gen === generation });
+    return;
+  }
+
   const cid = parseCid(text);
   if (!cid.ok) {
     out.append(problemCard(cid));
@@ -394,6 +413,7 @@ function render(value) {
   const result = resultCard(cid, controller.signal, details);
   out.append(result.el, details.el);
   lookUp(cid, result, details, gen, controller.signal);
+  lookUpArweave(cid, details, gen, controller.signal);
 }
 
 // The header gets a shadow once the page scrolls under it.
@@ -429,7 +449,8 @@ function fromUrl() {
 function show(value) {
   const text = value.trim();
   const post = text && parsePostLink(text);
-  const path = post ? `/post/${encodeURIComponent(post.author)}/${encodeURIComponent(post.permlink)}` : `/${text ? encodeURIComponent(text) : ''}`;
+  const arweaveId = parseArweaveId(text);
+  const path = post ? `/post/${encodeURIComponent(post.author)}/${encodeURIComponent(post.permlink)}` : `/${arweaveId || (text ? encodeURIComponent(text) : '')}`;
   window.history.replaceState(null, '', path);
   render(value);
 }

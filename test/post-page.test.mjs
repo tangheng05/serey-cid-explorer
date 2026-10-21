@@ -15,7 +15,7 @@ const cidOf = (bytes, size = bytes.length) => buildRawCid(blake3(bytes), size);
 const POST = 'https://serey.io/sereyexplorer/explorer/@chhaylin/bruce-lee-and-daoism';
 
 // files: CID -> bytes (or a status number); media: what Serey's API answers (or a status number).
-function network({ media, files, title = 'Bruce Lee and Daoism' }) {
+function network({ media, files, title = 'Bruce Lee and Daoism', arweave = {}, textArweave = null }) {
   const calls = [];
   const keyOf = Object.fromEntries(Object.keys(files).map((c) => [parseCid(c).key, c]));
   const fetchFake = async (url) => {
@@ -24,7 +24,13 @@ function network({ media, files, title = 'Bruce Lee and Daoism' }) {
     if (u.includes('/api/v2/media-proof/posts/chhaylin/bruce-lee-and-daoism')) {
       return typeof media === 'number' ? new Response('', { status: media }) : new Response(JSON.stringify({ media }));
     }
-    if (u.includes('/api/v1/sereyweb/getDetailByPermlink')) return new Response(JSON.stringify({ content: { title } }));
+    if (u.includes('/api/v1/sereyweb/getDetailByPermlink')) {
+      return new Response(JSON.stringify({ content: { title }, forever: textArweave ? { document: { arweave_id: textArweave } } : null }));
+    }
+    if (u === 'https://arweave.net/graphql') {
+      const edges = Object.entries(arweave).map(([cid, id]) => ({ node: { id, owner: { address: 'OWbotbFOnhyFMY309nf7DyM_ZA_YNWX408bA_9aoM6w' }, tags: [{ name: 'S5-CID', value: cid }] } }));
+      return new Response(JSON.stringify({ data: { transactions: { edges } } }));
+    }
     if (u.startsWith('https://s5.serey.io/s5/debug/storage_locations/')) {
       const key = u.split('/').pop();
       return keyOf[key] ? new Response(JSON.stringify({ locations: [{ type: 3, parts: [`https://storage.serey.io/blob/1/${key}`], expiry: Math.floor(Date.now() / 1000) + 3600 }] })) : new Response('', { status: 404 });
@@ -181,4 +187,37 @@ test('an unreachable API is explained in words, and titles lose their HTML entit
   titled.type(POST);
   await until(() => titled.doc.querySelector('.post-title').textContent === 'Tom & Jerry live', 'the title is plain text');
   assert.strictEqual(titled.doc.querySelector('.post-title b'), null);
+});
+
+test('a post lists the Arweave copy of each file and of its text beside the S5 one', async () => {
+  const a = png(13);
+  const b = png(7);
+  const AR_A = 'A'.repeat(43);
+  const AR_TEXT = 'T'.repeat(43);
+  const net = network({
+    media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }, { file: 'b.jpg', kind: 'images', s5_cid: cidOf(b) }],
+    files: { [cidOf(a)]: a, [cidOf(b)]: b },
+    arweave: { [cidOf(a)]: AR_A },
+    textArweave: AR_TEXT,
+  });
+  const page = await open(net);
+  page.type(POST);
+  await until(() => page.rows().length === 3, 'two files and the post text');
+  const [first, second, text] = page.rows();
+  await until(() => first.querySelector('.file-ar a'), 'the Arweave copy of the first file');
+  assert.strictEqual(first.querySelector('.file-ar a').getAttribute('href'), `/${AR_A}`);
+  assert.ok(first.textContent.includes('S5'), 'the S5 line stays');
+  assert.ok(!second.querySelector('.file-ar'), 'a file with no Arweave copy shows none');
+  assert.strictEqual(text.querySelector('strong').textContent, 'Post text');
+  assert.strictEqual(text.querySelector('.file-ar a').getAttribute('href'), `/${AR_TEXT}`);
+  await until(() => page.text().includes('All 2 files verified'), 'the summary counts only the S5 files');
+});
+
+test('a text-only Forever post lists its text on Arweave instead of "no files"', async () => {
+  const AR_TEXT = 'T'.repeat(43);
+  const page = await open(network({ media: [], files: {}, textArweave: AR_TEXT }));
+  page.type(POST);
+  await until(() => page.rows().length === 1, 'the post text row');
+  assert.strictEqual(page.rows()[0].querySelector('.file-ar a').getAttribute('href'), `/${AR_TEXT}`);
+  assert.ok(!page.text().includes('No files on S5 for this post'));
 });

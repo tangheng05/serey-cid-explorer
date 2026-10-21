@@ -2,9 +2,10 @@ import { parseCid } from './cid.js';
 import { fetchLocations } from './nodes.js';
 import { verifyUrl, sniffImage } from './verify.js';
 import { fileSize } from './format.js';
+import { findCopies } from './arweave.js';
 import { SEREY_NODE, AUTO_VERIFY_MAX_BYTES, CONFIRM_ABOVE_BYTES } from './config.js';
 import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, expiryValue } from './ui.js';
-import { fetchPostMedia, fetchPostTitle, postRows, postUrl, explorerUrl } from './serey.js';
+import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl } from './serey.js';
 
 // Pictures up to this size are kept after their check, to show as thumbnails.
 const THUMB_MAX_BYTES = 8 * 1024 * 1024;
@@ -24,6 +25,17 @@ const titleFromPermlink = (p) => {
 };
 const KIND_ICON = { images: 'image', videos: 'play', audio: 'music' };
 const SUB = { file: 'Attached to the post', poster: 'Poster frame of the video' };
+
+// The permanent copy on Arweave, opened on this site where it is checked.
+const arweaveLine = (id) => h('div', { class: 'file-cid file-ar' }, h('span', { class: 'file-cid-k' }, 'Arweave'), h('a', { class: 'mono link', href: `/${id}`, target: '_blank', rel: 'noopener' }, short(id)), copyButton(id));
+
+// The post's own text is kept on Arweave too; it has no S5 copy to check against.
+const textItem = (id) => h(
+  'article',
+  { class: 'file' },
+  h('div', { class: 'file-thumb' }, icon('file')),
+  h('div', { class: 'file-main' }, h('div', { class: 'file-name' }, h('strong', null, 'Post text')), h('div', { class: 'file-sub' }, 'The written post, kept permanently'), arweaveLine(id)),
+);
 
 // Every file of a Serey post on one page: each S5 content ID is found and checked in turn.
 export function renderPost(out, post, { signal, isCurrent }) {
@@ -50,19 +62,31 @@ export function renderPost(out, post, { signal, isCurrent }) {
   const filesCard = h('section', { class: 'card files' }, h('header', { class: 'files-head' }, h('h2', null, 'Files'), h('span', { class: 'files-count' })), list);
   out.append(head);
 
-  fetchPostTitle(post, { signal }).then((t) => { if (t && isCurrent()) title.textContent = t; });
+  const info = fetchPostInfo(post, { signal });
+  info.then(({ title: t }) => { if (t && isCurrent()) title.textContent = t; });
 
   fetchPostMedia(post, { signal }).then((media) => {
     if (!isCurrent()) return;
     const rows = postRows(media);
     if (!rows.length) {
-      summaryText.textContent = 'No files to check.';
-      out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('file')), h('div', null, h('h2', null, 'No files on S5 for this post'), h('p', null, 'Text-only posts, and posts published before Serey stored files on S5, have no content IDs to check.'))));
+      info.then(({ textArweave }) => {
+        if (!isCurrent()) return;
+        if (textArweave) {
+          summaryText.textContent = 'No files on S5. The post text is kept on Arweave.';
+          filesCard.querySelector('.files-count').textContent = '';
+          out.append(filesCard);
+          list.append(textItem(textArweave));
+          return;
+        }
+        summaryText.textContent = 'No files to check.';
+        out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('file')), h('div', null, h('h2', null, 'No files on S5 for this post'), h('p', null, 'Text-only posts, and posts published before Serey stored files on S5, have no content IDs to check.'))));
+      });
       return;
     }
     filesCard.querySelector('.files-count').textContent = `${rows.length} ${rows.length === 1 ? 'file' : 'files'}`;
     out.append(filesCard);
     start(rows);
+    info.then(({ textArweave }) => { if (textArweave && isCurrent()) list.append(textItem(textArweave)); });
   }).catch((e) => {
     if (!isCurrent()) return;
     summaryText.textContent = 'Could not load this post.';
@@ -130,6 +154,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
       const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
       const status = h('div', { class: 'file-status' });
       const reason = h('div', { class: 'file-reason', hidden: true });
+      const arweave = h('div', { class: 'file-ar-slot' });
       const sizeText = cid.ok ? fileSize(cid.size) : '';
       const toggle = h('button', { type: 'button', class: 'link file-toggle', 'aria-expanded': 'false' }, 'Details', icon('chevron'));
       const panelBody = h('div', { class: 'file-details-body' });
@@ -143,7 +168,8 @@ export function renderPost(out, post, { signal, isCurrent }) {
           { class: 'file-main' },
           h('div', { class: 'file-name' }, h('strong', null, r.label), sizeText ? h('span', { class: 'file-size' }, sizeText) : null),
           h('div', { class: 'file-sub' }, SUB[r.role]),
-          h('div', { class: 'file-cid' }, mono(short(r.cid)), copyButton(r.cid)),
+          h('div', { class: 'file-cid' }, h('span', { class: 'file-cid-k' }, 'S5'), mono(short(r.cid)), copyButton(r.cid)),
+          arweave,
           reason,
         ),
         h('div', { class: 'file-side' }, status, toggle),
@@ -208,6 +234,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
         state: 'queued',
         size: cid.ok ? cid.size : 0,
         videoItem: null,
+        showArweave: (id) => fill(arweave, arweaveLine(id)),
         setThumb(url) {
           fill(thumb, h('img', { src: url, alt: '' }));
           thumb.classList.add('has-img');
@@ -296,5 +323,12 @@ export function renderPost(out, post, { signal, isCurrent }) {
 
     items.filter((i) => i.state === 'queued').forEach(enqueue);
     summarize();
+
+    // One query finds the Arweave copy of every file; a failure only leaves the rows without it.
+    const byCid = Object.fromEntries(items.map((i, n) => [rows[n].cid, i]));
+    findCopies(Object.keys(byCid), { signal }).then((found) => {
+      if (!isCurrent()) return;
+      for (const [cid, [id]] of Object.entries(found)) byCid[cid].showArweave(id);
+    }).catch(() => {});
   }
 }
