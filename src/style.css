@@ -223,8 +223,6 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .copy-where { display: flex; flex-direction: column; line-height: 1.35; }
 .copy-where strong { color: var(--place); }
 .copy-row[data-state='none'] .copy-where strong { color: var(--muted); }
-.copy-where > span { color: var(--muted); font-size: .84rem; }
-.copy-where > .pasted { align-self: flex-start; margin-top: 4px; white-space: nowrap; padding: 1px 7px; color: var(--ink-2); font-size: .72rem; font-weight: 600; vertical-align: 1px; background: var(--line-soft); border-radius: 6px; }
 .copy-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .copy-meta { min-width: 0; color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
 .copy-actions { display: flex; gap: 8px; }
@@ -402,3 +400,9 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* A place without a copy: one slim line, no card */
+.record .copy-list .copy-row[data-state='none'], .file-details .copy-list .copy-row[data-state='none'] { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'where state'; gap: 0 14px; padding: 8px 14px; background: transparent; border: 1px dashed var(--line); border-left: 3px solid var(--line); }
+.copy-row[data-state='none'] .copy-where { grid-area: where; }
+.copy-row[data-state='none'] .copy-state { grid-area: state; }
+.copy-row[data-state='none'] .copy-meta { font-size: .86rem; }

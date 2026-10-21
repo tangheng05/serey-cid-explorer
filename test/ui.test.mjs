@@ -184,7 +184,7 @@ test("a file kept on Arweave shows both copies, each checked against the same fi
   assert.strictEqual(page.copy('arweave').querySelector('a').href, `https://arweave.net/${AR}`);
 });
 
-test('an Arweave ID opens the same record, marked as the copy you pasted', async () => {
+test('an Arweave ID opens the same record as its S5 ID', async () => {
   const cid = cidOf(PNG);
   const tx = { id: AR, owner: { address: SEREY_WALLET }, data: { size: String(PNG.length), type: 'image/png' }, tags: [{ name: 'S5-CID', value: cid }, { name: 'Serey-Author', value: 'chhaylin' }], block: { height: 7, timestamp: 1791582380 } };
   const page = await open(network({ files: { [cid]: PNG }, txs: { [AR]: tx }, arweaveFiles: { [AR]: PNG } }));
@@ -192,7 +192,6 @@ test('an Arweave ID opens the same record, marked as the copy you pasted', async
   assert.strictEqual(page.window.location.pathname, `/${AR}`);
   assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Arweave ID');
   await until(() => page.text().includes('Intact in both copies'), 'both copies verified');
-  assert.ok(page.copy('arweave').textContent.includes('You pasted this'));
   const facts = [...page.doc.querySelectorAll('.fact')].filter((f) => !f.hidden).map((f) => `${f.querySelector('dt').textContent}: ${f.querySelector('dd').textContent}`);
   assert.deepStrictEqual(facts.slice(0, 3), ['Type: Image', `Size: ${fileSize(PNG.length)}`, 'Posted by: @chhaylin']);
   assert.ok(page.text().includes("Serey's wallet"));

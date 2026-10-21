@@ -141,7 +141,7 @@ export function renderTx(out, tx) {
 | fp is its fingerprint ({ kind, hash, hashHex, size }); cid is the parsed S5 ID
 | when there is one, and arweave the Arweave copy already known ({ id, tx }).
 */
-export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent }) {
+export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
   const isText = fp.kind === 'sha256';
   const run = limiter(2);
   const size = Math.max(fp.size || 0, (arweave && arweave.tx && arweave.tx.size) || 0);
@@ -317,7 +317,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
 
   // The S5 copy, or a row saying a post text has none.
   if (cid) {
-    addCopy(createCopy({ ...base, place: 's5', cid, pasted: pasted === 's5' })).locate();
+    addCopy(createCopy({ ...base, place: 's5', cid })).locate();
     askOthers();
   } else {
     const none = addCopy(createCopy({ ...base, place: 's5' }));
@@ -327,7 +327,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
 
   // The Arweave copy: the one pasted, or found by its S5 ID.
   if (arweave) {
-    addCopy(createCopy({ ...base, place: 'arweave', arweaveId: arweave.id, size: tx && tx.size, pasted: pasted === 'arweave' })).auto();
+    addCopy(createCopy({ ...base, place: 'arweave', arweaveId: arweave.id, size: tx && tx.size })).auto();
   } else {
     const looking = addCopy(createCopy({ ...base, place: 'arweave' }));
     const look = () => {

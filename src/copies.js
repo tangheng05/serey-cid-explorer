@@ -39,13 +39,12 @@ const reason = (e) => (e && e.name === 'TypeError' ? 'The file could not be down
 | An S5 copy needs `cid` (for its node key); an Arweave copy needs `arweaveId`.
 | `size` is the most a download can be (an upload can be bigger than its tags say).
 */
-export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent = () => true, run = (task) => task(), keep = 0, pasted = false }) {
+export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent = () => true, run = (task) => task(), keep = 0 }) {
   const listeners = new Set();
   let bytes = Math.max(fp.size || 0, size || 0);
 
   const copy = {
     place,
-    pasted,
     arweaveId,
     state: 'idle',
     pct: 0,
@@ -181,7 +180,7 @@ function actionFor(copy) {
 // What sits under the copy's name: why it failed, or where it is.
 function metaFor(copy) {
   if (copy.why) return copy.why;
-  if (copy.state === 'none') return copy.about || '';
+  if (copy.state === 'none') return `Not kept here. ${copy.about || ''}`.trim();
   return copy.host || '';
 }
 
@@ -194,7 +193,7 @@ export function copyRow(copy) {
   const el = h(
     'div',
     { class: 'copy-row', 'data-place': copy.place },
-    h('div', { class: 'copy-where' }, h('strong', null, place.name), h('span', null, place.about), copy.pasted ? h('span', { class: 'pasted' }, 'You pasted this') : null),
+    h('div', { class: 'copy-where', title: place.about }, h('strong', null, place.name)),
     h('div', { class: 'copy-state' }, status, meta),
     actions,
   );
@@ -207,7 +206,8 @@ export function copyRow(copy) {
       return;
     }
     el.dataset.state = c.state;
-    const s = statusPill(c);
+    // A place without a copy is one quiet line: its name and why.
+    const s = c.state === 'none' ? { el: null, pct: null } : statusPill(c);
     pct = s.pct;
     fill(status, s.el);
     meta.textContent = metaFor(c);

@@ -36,8 +36,8 @@ async function openArweave(id, ctx) {
   const cid = parseCid(tx.s5Cid);
   const sha = textSha(tx);
   const arweave = { id, tx };
-  if (cid.ok) renderFile(out, { ...ctx, fp: fingerprintOf(cid), cid, arweave, pasted: 'arweave' });
-  else if (sha) renderFile(out, { ...ctx, fp: { kind: 'sha256', hash: fromHex(sha), hashHex: sha, size: tx.size || 0 }, arweave, pasted: 'arweave' });
+  if (cid.ok) renderFile(out, { ...ctx, fp: fingerprintOf(cid), cid, arweave });
+  else if (sha) renderFile(out, { ...ctx, fp: { kind: 'sha256', hash: fromHex(sha), hashHex: sha, size: tx.size || 0 }, arweave });
   else renderTx(out, tx);
 }
 
@@ -82,7 +82,7 @@ function render(value) {
   if (what.kind === 'post') renderPost(out, what.post, ctx);
   else if (what.kind === 'episode') openEpisode(what.episode, ctx);
   else if (what.kind === 'arweave') openArweave(what.arweaveId, ctx);
-  else if (what.kind === 'cid') renderFile(out, { ...ctx, fp: fingerprintOf(what.cid), cid: what.cid, pasted: 's5' });
+  else if (what.kind === 'cid') renderFile(out, { ...ctx, fp: fingerprintOf(what.cid), cid: what.cid });
   else if (what.kind === 'invalid') {
     const extra = what.cid.kind === 'ipfs' ? h('p', null, external(`https://cid.ipfs.tech/#${encodeURIComponent(what.cid.ipfs)}`, 'Open it in the IPFS CID inspector')) : null;
     out.append(problemCard('alert', 'Not an ID this page can check', what.cid.message || 'Paste a Serey post link, an S5 file ID or an Arweave ID.', extra));
