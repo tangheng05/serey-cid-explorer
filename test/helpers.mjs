@@ -35,6 +35,8 @@ export function network({ files = {}, serey, garden = 404, blob, media = [], tit
     }
     if (u.startsWith('https://s5.garden/')) return answer(garden);
     if (u.startsWith('https://storage.serey.io/blob/1/')) return answer(blob !== undefined ? blob : files[keyOf()[u.split('/').pop()]] ?? 404);
+    if (u.includes('/api/v2/podcast/get-by-id/7')) return answer({ podcast: { id: 7, author: 'chhaylin', permlink: 'bruce-lee-and-daoism', title: 'Episode seven' } });
+    if (u.includes('/api/v2/podcast/get-by-id/')) return answer(404);
     if (u.includes('/api/v2/media-proof/posts/chhaylin/bruce-lee-and-daoism')) return typeof media === 'number' ? answer(media) : answer({ media });
     if (u.includes('/api/v1/sereyweb/getDetailByPermlink')) return answer({ content: { title }, forever: textArweave ? { document: { arweave_id: textArweave } } : null });
     if (u === 'https://arweave.net/graphql') {

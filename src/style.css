@@ -193,9 +193,11 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .copies { padding: 4px 26px 22px; }
 .record-summary .copies { align-self: stretch; margin-top: 14px; padding: 18px 0 0; border-top: 1px solid var(--line-soft); }
 .record-top.no-media { grid-template-columns: minmax(0, 1fr); }
-/* Beside a picture the column is narrow: a copy's buttons go under its status */
-.record-top:not(.no-media) .record-summary .copy-row { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); padding: 10px 12px; }
-.record-top:not(.no-media) .record-summary .copy-actions { grid-column: 2; }
+/* Beside a picture the column is narrow: name and buttons on one line, the status under them */
+.record-top:not(.no-media) .record-summary .copy-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'where actions' 'state state'; gap: 8px 12px; padding: 12px 14px; }
+.record-top:not(.no-media) .record-summary .copy-where { grid-area: where; }
+.record-top:not(.no-media) .record-summary .copy-state { grid-area: state; }
+.record-top:not(.no-media) .record-summary .copy-actions { grid-area: actions; align-self: start; }
 .copies h3, .tech summary { font-size: 1rem; font-weight: 700; color: var(--navy); }
 .copies h3 { margin-bottom: 10px; }
 .copy-list { display: grid; gap: 10px; }
@@ -367,9 +369,12 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
   .reading { padding: 0 18px 18px; }
   .reading-body { padding: 18px; }
   .copies { padding: 4px 18px 18px; }
-  .copy-row, .record-summary .copy-row { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
-  .copy-state, .copy-actions { grid-column: 1 / -1; }
-  .record-top:not(.no-media) .record-summary .copy-actions { grid-column: 1 / -1; }
+  .copy-row, .record-summary .copy-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'where actions' 'state state'; gap: 8px 12px; padding: 12px 14px; }
+  .copy-where { grid-area: where; }
+  .copy-state { grid-area: state; }
+  .copy-actions { grid-area: actions; align-self: start; }
+  /* A row waiting for a click has two buttons: they get their own line */
+  .copy-row:has(.copy-actions .primary) { grid-template-areas: 'where where' 'state state' 'actions actions'; }
   .facts { grid-template-columns: minmax(0, 1fr); }
   .fact dt { padding: 10px 0 0; }
   .fact dd { padding: 2px 0 10px; }

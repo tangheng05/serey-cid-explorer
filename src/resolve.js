@@ -1,12 +1,14 @@
 import { parseCid } from './cid.js';
 import { parseArweaveId } from './arweave.js';
-import { parsePostLink } from './serey.js';
+import { parsePostLink, parsePodcastLink } from './serey.js';
 import { fileSize } from './format.js';
 
 // What was pasted, and how to say so under the box. Nothing here asks the network.
 export function classify(value) {
   const text = String(value || '').trim();
   if (!text) return { kind: 'empty', label: '' };
+  const episode = parsePodcastLink(text);
+  if (episode) return { kind: 'episode', episode, label: 'Serey podcast episode' };
   const post = parsePostLink(text);
   if (post) return { kind: 'post', post, label: `Serey post by @${post.author}` };
   const arweaveId = parseArweaveId(text);

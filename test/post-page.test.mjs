@@ -187,3 +187,27 @@ test('an opened row shows the technical details right there, asking Arweave once
   assert.ok(!text.includes('base32'), 'the long lists stay on the full record');
   assert.strictEqual(net.calls.filter((u) => u === 'https://arweave.net/graphql').length, 2, 'one lookup for the copies, one for this transaction');
 });
+
+test('a podcast link opens its episode as a post, with its own title and link', async () => {
+  const a = png(13);
+  const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: { [cidOf(a)]: a } }));
+  page.type('https://chhay.serey.io/podcast?episode=7');
+  assert.strictEqual(page.window.location.pathname, '/podcast/7');
+  assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Serey podcast episode');
+  await until(() => page.rows().length === 1, 'the episode files');
+  assert.strictEqual(page.doc.querySelector('.post-title').textContent, 'Episode seven');
+  assert.ok(page.text().includes('A Serey podcast episode by @chhaylin'));
+  assert.strictEqual(page.doc.querySelector('.post-links a').href, 'https://serey.io/podcast?episode=7');
+
+  const unknown = await open(network(), { path: 'podcast/8' });
+  assert.strictEqual(unknown.doc.getElementById('cid-input').value, 'https://serey.io/podcast?episode=8');
+  await until(() => unknown.text().includes('Serey does not know this episode'), 'an unknown episode is explained');
+});
+
+test('a video page link opens its post', async () => {
+  const a = png(13);
+  const page = await open(network({ media: [{ file: 'a.mp4', kind: 'videos', s5_cid: cidOf(a) }], files: { [cidOf(a)]: a } }));
+  page.type('https://chhay.serey.io/video-component/watch?author=chhaylin&permalink=bruce-lee-and-daoism');
+  assert.strictEqual(page.window.location.pathname, '/post/chhaylin/bruce-lee-and-daoism');
+  await until(() => page.rows().length === 1, 'the video row');
+});

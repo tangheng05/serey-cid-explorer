@@ -7,11 +7,35 @@ const PERMLINK = /^[a-z0-9][a-z0-9-]{0,255}$/i;
 // Community sites put a section before the post: chhay.serey.io/gallery/<account>/<permlink>, /video/..., and so on.
 const COMMUNITY_POST = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/(?!sereyexplorer\/|api\/)[a-z0-9-]+\/([^/?#\s]+)\/([^/?#\s]+)/i;
 
+// Video pages name the post in the query: <name>.serey.io/video-component/watch?author=<account>&permalink=<permlink>.
+const QUERY_LINK = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/[^?#\s]*\?([^#\s]+)/i;
+
+function postFromQuery(raw) {
+  const m = raw.match(QUERY_LINK);
+  if (!m) return null;
+  const params = new URLSearchParams(m[1]);
+  const author = (params.get('author') || '').toLowerCase();
+  const permlink = params.get('permalink') || params.get('permlink') || '';
+  return NAME.test(author) && PERMLINK.test(permlink) ? { author, permlink } : null;
+}
+
+// A podcast episode is named by its number: <name>.serey.io/podcast?episode=3097, or /<community>/podcast?episode=3097.
+const PODCAST_LINK = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/(?:[^?#\s]*\/)?podcast\/?\?([^#\s]+)/i;
+
+export function parsePodcastLink(text) {
+  const m = String(text || '').trim().match(PODCAST_LINK);
+  if (!m) return null;
+  const episode = new URLSearchParams(m[1]).get('episode') || '';
+  return /^[1-9]\d{0,9}$/.test(episode) ? Number(episode) : null;
+}
+
 // A Serey post named by a link or a short "@account/permlink": serey.io/authors/<account>/<permlink>,
 // a community link such as <name>.serey.io/gallery/<account>/<permlink>, any serey link with
 // /@<account>/<permlink>, or this site's own /post/<account>/<permlink>.
 export function parsePostLink(text) {
   const raw = String(text || '').trim();
+  const byQuery = postFromQuery(raw);
+  if (byQuery) return byQuery;
   const m = raw.match(/\/(?:authors|post)\/([^/?#\s]+)\/([^/?#\s]+)/)
     || raw.match(/(?:^|\/)@([^/?#\s]+)\/([^/?#\s]+)/)
     || raw.match(COMMUNITY_POST);
@@ -80,6 +104,25 @@ export async function fetchPostInfo({ author, permlink }, opts) {
     return { title: null, textArweave: null };
   }
 }
+
+// The author and permlink of an episode, which is where its stored files are listed; null when Serey does not know it.
+export async function fetchEpisode(id, opts) {
+  let body;
+  try {
+    body = await getJson(`${SEREY_API}/api/v2/podcast/get-by-id/${id}`, opts);
+  } catch (e) {
+    if (/ 404$/.test(e.message)) return null;
+    throw e;
+  }
+  const p = body && body.podcast;
+  const author = p && typeof p.author === 'string' ? p.author.toLowerCase() : '';
+  const permlink = p && typeof p.permlink === 'string' ? p.permlink : '';
+  if (!NAME.test(author) || !PERMLINK.test(permlink)) return null;
+  const title = typeof p.title === 'string' ? p.title.replace(/\s+/g, ' ').trim() : '';
+  return { author, permlink, title: title || null, episode: id };
+}
+
+export const episodeUrl = (id) => `https://serey.io/podcast?episode=${id}`;
 
 export const postUrl = ({ author, permlink }) => `https://serey.io/authors/${encodeURIComponent(author)}/${encodeURIComponent(permlink)}`;
 export const explorerUrl = ({ author, permlink }) => `https://serey.io/sereyexplorer/explorer/@${encodeURIComponent(author)}/${encodeURIComponent(permlink)}`;

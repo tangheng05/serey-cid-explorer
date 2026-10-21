@@ -3,7 +3,7 @@ import { sniffImage } from './verify.js';
 import { fileSize } from './format.js';
 import { findCopies, fetchTx, textSha, TEXT_MAX_BYTES } from './arweave.js';
 import { h, fill, icon, external, mono, copyButton, concat } from './ui.js';
-import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl } from './serey.js';
+import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl, episodeUrl } from './serey.js';
 import { createCopy, copyRow, copyCell, limiter } from './copies.js';
 import { fromHex } from './cid.js';
 import { problemCard, short, techSections } from './file-view.js';
@@ -29,17 +29,18 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 // Every file of a Serey post, and its text, each with its copy on S5 and on Arweave.
 export function renderPost(out, post, { signal, isCurrent }) {
   const run = limiter(2);
-  const title = h('h2', { class: 'post-title' }, titleFromPermlink(post.permlink));
+  const title = h('h2', { class: 'post-title' }, post.title || titleFromPermlink(post.permlink));
   const verdict = h('h3', { class: 'verdict busy' }, 'Checking copies');
   const summary = h('p', { class: 'post-summary' }, 'Loading the files of this post…');
   const segments = h('div', { class: 'segments' });
+  const progress = h('div', { class: 'post-progress' }, verdict, summary, segments);
   const head = h(
     'section',
     { class: 'card post-head' },
     title,
-    h('p', { class: 'post-by' }, 'A Serey post by ', h('strong', null, `@${post.author}`)),
-    h('div', { class: 'post-links' }, external(postUrl(post), [icon('out'), 'Open on Serey'], 'chip-link'), external(explorerUrl(post), [icon('out'), 'Open in Serey Explorer'], 'chip-link')),
-    h('div', { class: 'post-progress' }, verdict, summary, segments),
+    h('p', { class: 'post-by' }, post.episode ? 'A Serey podcast episode by ' : 'A Serey post by ', h('strong', null, `@${post.author}`)),
+    h('div', { class: 'post-links' }, external(post.episode ? episodeUrl(post.episode) : postUrl(post), [icon('out'), 'Open on Serey'], 'chip-link'), external(explorerUrl(post), [icon('out'), 'Open in Serey Explorer'], 'chip-link')),
+    progress,
   );
   const list = h('div', { class: 'file-list' });
   const table = h(
@@ -52,7 +53,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
 
   const items = [];
   const info = fetchPostInfo(post, { signal });
-  info.then(({ title: t }) => { if (t && isCurrent()) title.textContent = t; });
+  info.then(({ title: t }) => { if (t && !post.title && isCurrent()) title.textContent = t; });
 
   fetchPostMedia(post, { signal }).then(async (media) => {
     if (!isCurrent()) return;
@@ -60,9 +61,11 @@ export function renderPost(out, post, { signal, isCurrent }) {
     const { textArweave } = await info;
     if (!isCurrent()) return;
     if (!rows.length && !textArweave) {
-      verdict.hidden = true;
-      summary.textContent = 'Nothing to check.';
-      out.append(problemCard('file', 'This post has no stored files', 'Text-only posts, and posts published before Serey stored files on S5, have nothing to check.'));
+      // The card below says why; the header only names the post.
+      progress.hidden = true;
+      out.append(post.episode
+        ? problemCard('file', 'This episode has no stored files to check', 'Episodes hosted elsewhere, like YouTube, keep nothing on Serey. Audio episodes are not on S5 yet, so they cannot be checked here.')
+        : problemCard('file', 'This post has no stored files', 'Text-only posts, and posts published before Serey stored files on S5, have nothing to check.'));
       return;
     }
     out.append(table);
@@ -71,8 +74,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
     summarize();
   }).catch((e) => {
     if (!isCurrent()) return;
-    verdict.hidden = true;
-    summary.textContent = 'Could not load this post.';
+    progress.hidden = true;
     // A network or cross-origin failure has no status; say so in words.
     const why = e && e.name === 'TypeError' ? "Serey's API could not be reached from this page" : (e.message || String(e));
     out.append(problemCard('alert', 'Could not load the files of this post', `${why}. Check the link, or try again in a moment.`));
