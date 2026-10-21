@@ -73,19 +73,59 @@ function kindName(type, isText) {
 
 export const problemCard = (art, title, ...text) => h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon(art)), h('div', null, h('h2', null, title), ...text.filter(Boolean).map((t) => (t instanceof Node ? t : h('p', null, t)))));
 
-// What Arweave says about a transaction, for the record's technical details.
-function arweaveRows(id, tx) {
+// What Arweave says about a transaction, for the technical details.
+function arweaveRows(id, tx, full = true) {
   if (!tx) return [row('Transaction', withCopy(id)), row('Address', link(arweaveUrl(id)))];
   const when = tx.time ? `${new Date(tx.time * 1000).toLocaleString()}, ${relativeTime(tx.time)}, in block ${tx.height.toLocaleString('en-US')}` : 'Not in a block yet';
   return [
     row('Transaction', withCopy(id)),
     tx.owner ? row('Uploaded by', h('span', { class: 'value copyable' }, mono(tx.owner), copyButton(tx.owner), isSereyWallet(tx.owner) ? pill('ok', "Serey's wallet") : pill('warn', 'Not Serey'))) : null,
     row('Confirmed', when),
-    tx.type ? row('Content type', tx.type) : null,
+    full && tx.type ? row('Content type', tx.type) : null,
     row('Address', link(arweaveUrl(id))),
     row('Explorer', link(`${ARWEAVE_EXPLORER_URL}${id}`)),
-    tx.tags.length ? h('h4', { class: 'tech-sub' }, 'Tags') : null,
-    tx.tags.map((t) => row(t.name, mono(t.value))),
+    full && tx.tags.length ? h('h4', { class: 'tech-sub' }, 'Tags') : null,
+    full ? tx.tags.map((t) => row(t.name, mono(t.value))) : null,
+  ];
+}
+
+const compare = (label, expected, got) => row(label, h('span', { class: 'value cmp' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got));
+
+/*
+| The technical details of a file: its fingerprint, where each copy is, and what each check found.
+| The record shows them in full; a post row leaves out the other ID forms, other S5 nodes and tags.
+*/
+export function techSections({ fp, cid, copies, tx, others, full }) {
+  const isText = fp.kind === 'sha256';
+  const s5 = copies.find((c) => c.place === 's5' && c.state !== 'none');
+  const ar = copies.find((c) => c.place === 'arweave' && c.arweaveId);
+  const checked = copies.filter((c) => c.res);
+  return [
+    section('hash', 'Fingerprint', null, h(
+      'div',
+      { class: 'sect-body' },
+      row('Method', isText ? 'SHA-256 of the stored text' : 'BLAKE3, 256 bit'),
+      fp.hashHex ? row('Hash', withCopy(fp.hashHex)) : null,
+      fp.size ? row('Size', `${fileSize(fp.size)} (${fp.size.toLocaleString('en-US')} bytes)`) : null,
+      cid && cid.ok ? row(full ? 'S5 ID, base58' : 'S5 ID', withCopy(cid.forms.base58)) : null,
+      full && cid ? [row('S5 ID, base32', withCopy(cid.forms.base32)), row('S5 ID, base64url', withCopy(cid.forms.base64url))] : null,
+    )),
+    s5 ? section('server', 'S5', null, h(
+      'div',
+      { class: 'sect-body' },
+      s5.why && !s5.url ? h('p', { class: 'note' }, s5.why) : null,
+      s5.locations.map((loc) => h(
+        'div',
+        { class: 'loc' },
+        loc.parts.length ? loc.parts.map((url) => row('Address', link(url))) : row('Address', 'The node has no https address for it'),
+        full ? row('Kind', loc.type) : null,
+        loc.expiry ? row('Offer', expiryValue(loc.expiry, () => s5.locate())) : null,
+        full && loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
+      )),
+      full && others ? [h('h4', { class: 'tech-sub' }, 'Other S5 nodes'), others.map(({ node, found }) => row(node.name, h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also has this file') : pill('neutral', 'Does not have it'))))] : null,
+    )) : null,
+    ar ? section('database', 'Arweave', null, h('div', { class: 'sect-body' }, arweaveRows(ar.arweaveId, tx, full))) : null,
+    checked.length ? section('shield', 'Checks', null, h('div', { class: 'sect-body' }, checked.map((c) => compare(`${PLACES[c.place].name} copy`, mono(fp.hashHex), mono(c.res.gotHex))))) : null,
   ];
 }
 
@@ -129,8 +169,8 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
     { class: 'card record' },
     h(
       'div',
-      { class: isText ? 'record-top no-media' : 'record-top' },
-      media,
+      { class: isText ? 'record-top is-text' : 'record-top' },
+      media || reading,
       h(
         'div',
         { class: 'record-summary' },
@@ -146,7 +186,6 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
         h('label', { class: 'btn' }, icon('shield'), 'Check a copy you have', fileInput),
       ),
     ),
-    reading,
     h('div', { class: 'copies' }, h('h3', null, 'Copies'), list),
     h('details', { class: 'tech' }, h('summary', null, 'Technical details', icon('chevron')), tech),
   );
@@ -230,37 +269,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
   }
 
   function paintTech() {
-    const s5 = copies.find((c) => c.place === 's5' && c.state !== 'none');
-    const ar = copies.find((c) => c.place === 'arweave' && c.arweaveId);
-    const compare = (label, expected, got) => row(label, h('span', { class: 'value cmp' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got));
-    const checked = copies.filter((c) => c.res);
-    fill(
-      tech,
-      section('hash', 'Fingerprint', null, h(
-        'div',
-        { class: 'sect-body' },
-        row('Method', isText ? 'SHA-256 of the stored text' : 'BLAKE3, 256 bit'),
-        row('Hash', withCopy(fp.hashHex)),
-        fp.size ? row('Size', `${fileSize(fp.size)} (${fp.size.toLocaleString('en-US')} bytes)`) : null,
-        cid ? [row('S5 ID, base58', withCopy(cid.forms.base58)), row('S5 ID, base32', withCopy(cid.forms.base32)), row('S5 ID, base64url', withCopy(cid.forms.base64url))] : null,
-      )),
-      s5 ? section('server', 'S5', null, h(
-        'div',
-        { class: 'sect-body' },
-        s5.state === 'failed' && !s5.url ? h('p', { class: 'note' }, s5.why) : null,
-        s5.locations.map((loc) => h(
-          'div',
-          { class: 'loc' },
-          loc.parts.length ? loc.parts.map((url) => row('Address', link(url))) : row('Address', 'The node has no https address for it'),
-          row('Kind', loc.type),
-          loc.expiry ? row('Offer', expiryValue(loc.expiry, () => s5.locate())) : null,
-          loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
-        )),
-        others ? [h('h4', { class: 'tech-sub' }, 'Other S5 nodes'), others.map(({ node, found }) => row(node.name, h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also has this file') : pill('neutral', 'Does not have it'))))] : null,
-      )) : null,
-      ar ? section('database', 'Arweave', null, h('div', { class: 'sect-body' }, arweaveRows(ar.arweaveId, tx))) : null,
-      checked.length ? section('shield', 'Checks', null, h('div', { class: 'sect-body' }, checked.map((c) => compare(`${PLACES[c.place].name} copy`, mono(fp.hashHex), mono(c.res.gotHex))))) : null,
-    );
+    fill(tech, techSections({ fp, cid, copies, tx, others, full: true }));
   }
 
   // Other S5 nodes are only asked to corroborate; none of them blocks the page.

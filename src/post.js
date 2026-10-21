@@ -6,7 +6,7 @@ import { h, fill, icon, external, mono, copyButton, concat } from './ui.js';
 import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl } from './serey.js';
 import { createCopy, copyRow, copyCell, limiter } from './copies.js';
 import { fromHex } from './seal.js';
-import { problemCard, short } from './file-view.js';
+import { problemCard, short, techSections } from './file-view.js';
 
 // Pictures up to this size are kept after their check, to show as thumbnails.
 const THUMB_MAX_BYTES = 8 * 1024 * 1024;
@@ -87,7 +87,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
       const base = { fp, signal, isCurrent, run, keep };
       const s5 = createCopy({ ...base, place: 's5', cid });
       const ar = createCopy({ ...base, place: 'arweave' });
-      const item = fileItem({ ...r, size: cid.ok ? cid.size : null, id: r.cid, href: `/${encodeURIComponent(r.cid)}` }, s5, ar);
+      const item = fileItem({ ...r, size: cid.ok ? cid.size : null, id: r.cid, href: `/${encodeURIComponent(r.cid)}`, fp, cid }, s5, ar);
       if (r.kind === 'videos' && r.role === 'file') lastVideo = item;
       if (r.role === 'poster') item.videoItem = lastVideo;
       if (!cid.ok) {
@@ -124,7 +124,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
     const fp = { kind: 'sha256', size: 0 };
     const s5 = createCopy({ fp, place: 's5', signal, isCurrent });
     const ar = createCopy({ fp, place: 'arweave', arweaveId: id, signal, isCurrent, run });
-    const item = fileItem({ kind: 'text', role: 'text', label: 'Post text', id, href: `/${id}` }, s5, ar);
+    const item = fileItem({ kind: 'text', role: 'text', label: 'Post text', id, href: `/${id}`, fp }, s5, ar);
     s5.about = 'Post texts are kept on Arweave only.';
     s5.set('none');
     ar.set('looking');
@@ -137,6 +137,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
         return;
       }
       Object.assign(fp, { hash: fromHex(sha), hashHex: sha, size: tx.size || 0 });
+      item.tx = tx;
       item.setSize(tx.size);
       ar.auto();
     }).catch((e) => {
@@ -148,6 +149,8 @@ export function renderPost(out, post, { signal, isCurrent }) {
 
   function fileItem(r, s5, ar) {
     const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
+    const techBody = h('div', { class: 'tech-body' });
+    const tech = h('details', { class: 'tech inline' }, h('summary', null, 'Technical details', icon('chevron')), techBody);
     const sizeText = h('span', { class: 'file-size' }, r.size != null ? fileSize(r.size) : '');
     const toggle = h('button', { type: 'button', class: 'file-toggle', 'aria-expanded': 'false', 'aria-label': `Details of ${r.label}` }, icon('chevron'));
     const panel = h(
@@ -157,10 +160,11 @@ export function renderPost(out, post, { signal, isCurrent }) {
         'div',
         { class: 'file-details-in' },
         h('div', { class: 'copy-list' }, copyRow(s5), copyRow(ar)),
+        tech,
         h(
           'div',
           { class: 'file-details-foot' },
-          h('p', null, 'Its fingerprint, every technical detail, and a check of a copy you have.'),
+          h('p', null, 'The full record adds a large preview, every ID form and tag, and a check of a copy you have.'),
           h('a', { class: 'btn small primary file-record', href: r.href, target: '_blank', rel: 'noopener' }, 'Open the full record', icon('out')),
         ),
       ),
@@ -195,14 +199,26 @@ export function renderPost(out, post, { signal, isCurrent }) {
       ar,
       cid: r.role !== 'text' && parseCid(r.id).ok ? r.id : null,
       videoItem: null,
+      tx: null,
       setSize(n) { if (n != null) sizeText.textContent = fileSize(n); },
+      // Drawn only while open; what Arweave says about the copy is asked for the first time it is.
+      paintTech() {
+        if (!tech.open) return;
+        fill(techBody, techSections({ fp: r.fp, cid: r.cid, copies: [s5, ar], tx: item.tx, full: false }));
+        if (!item.tx && ar.arweaveId && !item.askedTx) {
+          item.askedTx = true;
+          fetchTx(ar.arweaveId, { signal }).then((t) => { if (t && isCurrent()) { item.tx = t; item.paintTech(); } }).catch(() => {});
+        }
+      },
       setThumb(url) {
         fill(thumb, h('img', { src: url, alt: '' }));
         thumb.classList.add('has-img');
       },
     };
+    tech.addEventListener('toggle', () => item.paintTech());
     const onChange = (copy, progress) => {
       if (progress) return;
+      item.paintTech();
       el.dataset.state = [s5, ar].some((c) => c.state === 'bad') ? 'bad' : '';
       if (copy.state === 'ok' && copy.res.kept && !thumb.classList.contains('has-img')) {
         const bytes = concat(copy.res.kept);

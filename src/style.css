@@ -154,10 +154,11 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .media.has-preview { min-height: 0; background: none; border: 0; border-radius: 0; }
 .preview { display: grid; place-items: center; width: 100%; }
 .preview img, .preview video { display: block; max-width: 100%; max-height: 440px; border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 21, 53, .08), 0 8px 24px rgba(15, 21, 53, .10); }
-.record-top.no-media { grid-template-columns: minmax(0, 1fr); }
+/* A text is the main column, with the verdict beside it */
+.record-top.is-text { grid-template-columns: minmax(0, 1fr) minmax(0, 260px); }
 
 /* A post text, set for reading */
-.reading { padding: 0 26px 22px; }
+.reading { min-width: 0; }
 .reading h3 { margin-bottom: 10px; font-size: 1rem; font-weight: 700; color: var(--navy); }
 .reading-body { padding: 26px 30px; background: var(--paper); border: 1px solid var(--line-soft); border-radius: 12px; }
 .reading-body .media-empty { padding: 8px; }
@@ -337,6 +338,9 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
 .file-details { display: none; grid-column: 1 / -1; }
 .file.open .file-details { display: block; }
 .file-details-in { display: grid; gap: 12px; margin-top: 14px; padding: 14px; background: var(--paper); border-radius: 12px; }
+.tech.inline { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.tech.inline summary { padding: 12px 16px; font-size: .95rem; }
+.tech.inline .tech-body { padding: 0 16px 8px; }
 .file-details-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 4px 2px 0; }
 .file-details-foot p { color: var(--muted); font-size: .86rem; }
 .file-record .icon { width: 14px; height: 14px; }
@@ -351,13 +355,16 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
   .how { grid-template-columns: 1fr; gap: 20px; }
   .record-top { grid-template-columns: 1fr; gap: 20px; padding: 18px; }
   .media { min-height: 160px; }
-  .reading { padding: 0 18px 18px; }
+  .record-top.is-text { grid-template-columns: minmax(0, 1fr); }
+  .record-top.is-text .record-summary { order: -1; }
   .reading-body { padding: 18px; }
   .copies { padding: 4px 18px 18px; }
   .copy-row { grid-template-columns: minmax(0, 1fr) 34px; padding: 12px 14px; }
   .copy-state, .copy-actions { grid-column: 1 / -1; }
   .tech summary { padding: 14px 18px; }
   .tech-body { padding: 0 18px 12px; }
+  .tech.inline summary { padding: 12px 14px; }
+  .tech.inline .tech-body { padding: 0 14px 8px; }
   .row { grid-template-columns: 1fr; gap: 2px; }
   .files-head { display: none; }
   .file { grid-template-columns: 52px minmax(0, 1fr) 32px; gap: 10px 14px; padding: 14px 16px; }

@@ -161,3 +161,30 @@ test('a text-only Forever post lists its text instead of "no files"', async () =
   assert.ok(!page.text().includes('This post has no stored files'));
   assert.ok(page.text().startsWith('Bruce Lee and Daoism') || page.text().includes('The post text.'));
 });
+
+test('an opened row shows the technical details right there, asking Arweave once', async () => {
+  const a = png(13);
+  const AR_A = 'A'.repeat(43);
+  const net = network({
+    media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }],
+    files: { [cidOf(a)]: a },
+    copies: { [cidOf(a)]: AR_A },
+    arweaveFiles: { [AR_A]: a },
+    txs: { [AR_A]: { id: AR_A, owner: { address: SEREY_WALLET }, data: { size: String(a.length) }, tags: [], block: { height: 9, timestamp: 1791582380 } } },
+  });
+  const page = await open(net);
+  page.type(POST);
+  await until(() => page.rows()[0] && cell(page.rows()[0], 'arweave').dataset.state === 'ok', 'both copies checked');
+  const row = page.rows()[0];
+  row.querySelector('.file-main').click();
+  const tech = row.querySelector('.tech.inline');
+  tech.open = true;
+  tech.dispatchEvent(new page.window.Event('toggle'));
+  await until(() => tech.textContent.includes("Serey's wallet"), 'the Arweave transaction is shown');
+  const text = tech.textContent;
+  assert.ok(text.includes(parseCid(cidOf(a)).hashHex), 'the fingerprint');
+  assert.ok(text.includes(`https://storage.serey.io/blob/1/${parseCid(cidOf(a)).key}`), 'where S5 keeps it');
+  assert.ok(text.includes('S5 copy') && text.includes('Arweave copy'), 'what each check found');
+  assert.ok(!text.includes('base32'), 'the long lists stay on the full record');
+  assert.strictEqual(net.calls.filter((u) => u === 'https://arweave.net/graphql').length, 2, 'one lookup for the copies, one for this transaction');
+});
