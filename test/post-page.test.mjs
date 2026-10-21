@@ -193,7 +193,6 @@ test('a podcast link opens its episode as a post, with its own title and link', 
   const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: { [cidOf(a)]: a } }));
   page.type('https://chhay.serey.io/podcast?episode=7');
   assert.strictEqual(page.window.location.pathname, '/podcast/7');
-  assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Serey podcast episode');
   await until(() => page.rows().length === 1, 'the episode files');
   assert.strictEqual(page.doc.querySelector('.post-title').textContent, 'Episode seven');
   assert.ok(page.text().includes('A Serey podcast episode by @chhaylin'));

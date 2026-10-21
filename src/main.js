@@ -10,7 +10,6 @@ const input = document.getElementById('cid-input');
 const intro = document.getElementById('intro');
 const out = document.getElementById('output');
 const clear = document.getElementById('clear');
-const recognised = document.getElementById('recognised');
 
 let generation = 0;
 let controller = null;
@@ -72,8 +71,6 @@ function render(value) {
   out.replaceChildren();
 
   const what = classify(value);
-  recognised.textContent = what.label;
-  recognised.dataset.kind = what.kind;
   intro.hidden = what.kind !== 'empty';
   clear.hidden = what.kind === 'empty';
   document.body.classList.toggle('has-result', what.kind !== 'empty');

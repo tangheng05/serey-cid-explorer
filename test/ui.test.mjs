@@ -16,7 +16,6 @@ test('a CID in the link opens its record, with the S5 copy and technical details
   const page = await open(net, { hash: cid });
 
   assert.strictEqual(page.doc.getElementById('intro').hidden, true, 'the explainer steps aside');
-  assert.strictEqual(page.doc.getElementById('recognised').textContent, `S5 file ID, ${fileSize(PNG.length)}`);
   await until(() => page.text().includes('Other S5 nodes') && page.text().includes('Also has this file'), 'both nodes answered');
   const t = page.text();
   assert.ok(t.includes(`${PNG.length.toLocaleString('en-US')} bytes`));
@@ -106,7 +105,6 @@ test('typing something that is not an ID explains why and asks nobody', async ()
 
   page.type('hello world');
   assert.ok(page.text().includes('Not an ID this page can check'));
-  assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Not an ID this page knows');
   page.type('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG');
   assert.ok(page.text().includes('IPFS'));
   assert.ok(page.doc.querySelector('#output a').href.startsWith('https://cid.ipfs.tech/#'));
@@ -190,7 +188,6 @@ test('an Arweave ID opens the same record as its S5 ID', async () => {
   const page = await open(network({ files: { [cid]: PNG }, txs: { [AR]: tx }, arweaveFiles: { [AR]: PNG } }));
   page.type(`https://arweave.net/${AR}`);
   assert.strictEqual(page.window.location.pathname, `/${AR}`);
-  assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Arweave ID');
   await until(() => page.text().includes('Intact in both copies'), 'both copies verified');
   const facts = [...page.doc.querySelectorAll('.fact')].filter((f) => !f.hidden).map((f) => `${f.querySelector('dt').textContent}: ${f.querySelector('dd').textContent}`);
   assert.deepStrictEqual(facts.slice(0, 3), ['Type: Image', `Size: ${fileSize(PNG.length)}`, 'Posted by: @chhaylin']);
@@ -222,5 +219,4 @@ test('the examples fill the box and open their page', async () => {
   const page = await open(network());
   page.doc.querySelector('[data-example]').click();
   assert.ok(page.doc.getElementById('cid-input').value.startsWith('https://serey.io/authors/chhaylin/'));
-  assert.strictEqual(page.doc.getElementById('recognised').textContent, 'Serey post by @chhaylin');
 });

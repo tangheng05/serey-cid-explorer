@@ -103,12 +103,6 @@ a:hover { text-decoration: underline; }
 .search-clear:hover { background: var(--line-soft); color: var(--ink); }
 .search-clear svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 
-/* What the box recognised, as you type */
-.recognised:empty { display: none; }
-.recognised { margin-top: 10px; padding-left: 4px; color: #c5cbf2; font-size: .88rem; font-weight: 500; }
-.recognised:not(:empty)::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #8fe3b0; vertical-align: 1px; }
-.recognised[data-kind='invalid']::before { background: #ffc46b; }
-.recognised[data-kind='arweave']::before { background: #c7a8ff; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; color: #aab2e6; font-size: .86rem; }
 .example { padding: 6px 12px; font: 500 .84rem var(--sans); color: #fff; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .22); border-radius: 999px; cursor: pointer; }
 .example:hover { background: rgba(255, 255, 255, .16); }
@@ -220,7 +214,8 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .copy-row[data-state='none'] { background: var(--paper); border-left-color: var(--line); }
 .copy-row[data-state='bad'] { background: var(--bad-bg); border-color: var(--bad-line); border-left-color: var(--bad); }
 .copy-row[data-state='checking']::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: var(--p, 0%); background: var(--place); transition: width .15s linear; }
-.copy-where { display: flex; flex-direction: column; line-height: 1.35; }
+.copy-where { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; line-height: 1.35; }
+.copy-host { color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
 .copy-where strong { color: var(--place); }
 .copy-row[data-state='none'] .copy-where strong { color: var(--muted); }
 .copy-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
@@ -288,6 +283,7 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .btn.ghost { color: var(--s5); background: transparent; border-color: #d5dcff; }
 .btn.small { gap: 6px; padding: 5px 11px; font-size: .82rem; border-radius: 8px; }
 .btn.small .icon { width: 15px; height: 15px; }
+.btn.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
 .copy-row[data-place='arweave'] .btn.ghost { color: var(--ar); border-color: #ddd0fb; }
 label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offset: 2px; }
 .link { display: inline-flex; align-items: center; gap: 6px; padding: 0; font: 600 .88rem var(--sans); color: var(--s5); background: none; border: 0; cursor: pointer; }

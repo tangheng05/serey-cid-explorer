@@ -58,6 +58,8 @@ export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent 
     file: null,
     on(fn) { listeners.add(fn); },
     // An Arweave copy found after the row was drawn.
+    // How much a check of this copy downloads.
+    size: () => bytes,
     attach(id, more) {
       copy.arweaveId = id;
       copy.url = arweaveUrl(id);
@@ -177,11 +179,10 @@ function actionFor(copy) {
   return null;
 }
 
-// What sits under the copy's name: why it failed, or where it is.
+// What sits beside the status: why it failed or waits, or why there is no copy.
 function metaFor(copy) {
-  if (copy.why) return copy.why;
   if (copy.state === 'none') return `Not kept here. ${copy.about || ''}`.trim();
-  return copy.host || '';
+  return copy.why || '';
 }
 
 // One copy as a row of the record: where it is, its state, and what to do.
@@ -189,11 +190,12 @@ export function copyRow(copy) {
   const place = PLACES[copy.place];
   const status = h('div', { class: 'copy-status' });
   const meta = h('p', { class: 'copy-meta' });
+  const host = h('span', { class: 'copy-host' });
   const actions = h('div', { class: 'copy-actions' });
   const el = h(
     'div',
     { class: 'copy-row', 'data-place': copy.place },
-    h('div', { class: 'copy-where', title: place.about }, h('strong', null, place.name)),
+    h('div', { class: 'copy-where', title: place.about }, h('strong', null, place.name), host),
     h('div', { class: 'copy-state' }, status, meta),
     actions,
   );
@@ -211,6 +213,7 @@ export function copyRow(copy) {
     pct = s.pct;
     fill(status, s.el);
     meta.textContent = metaFor(c);
+    host.textContent = c.state === 'none' ? '' : c.host;
     fill(actions, actionFor(c), c.url && c.place !== 'local' ? h('a', { class: 'btn small ghost', href: c.url, target: '_blank', rel: 'noopener noreferrer' }, icon('out'), 'Open') : null);
   }
   copy.on(paint);
@@ -234,12 +237,19 @@ export function copyCell(copy) {
       fill(el, h('span', { class: 'pill none' }, 'Not kept'));
       return;
     }
+    // A cell waiting on the visitor is just the button, so it fits on one line.
+    pct = null;
+    if (c.state === 'waiting') {
+      fill(el, h('button', { type: 'button', class: 'btn small', onclick: () => c.ask() }, icon('download'), `Check (${fileSize(c.size())})`));
+      return;
+    }
+    if (c.state === 'failed' && c.retry !== false) {
+      fill(el, h('button', { type: 'button', class: 'btn small warn', onclick: () => (c.retry ? c.retry() : c.ask()) }, 'Try again'));
+      return;
+    }
     const s = statusPill(c);
     pct = s.pct;
-    const action = c.state === 'waiting' ? h('button', { type: 'button', class: 'btn small', onclick: () => c.ask() }, 'Check')
-      : c.state === 'failed' && c.retry !== false ? h('button', { type: 'button', class: 'btn small', onclick: () => (c.retry ? c.retry() : c.ask()) }, 'Try again')
-        : null;
-    fill(el, s.el, action);
+    fill(el, s.el);
   }
   copy.on(paint);
   paint(copy, false);
