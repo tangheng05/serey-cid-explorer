@@ -51,22 +51,28 @@
 
   <main>
     <section id="intro" class="how">
-      <div id="how-seal" class="how-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></div>
       <div class="how-text">
         <h2>How a check works</h2>
-        <p>Every file has a fingerprint, worked out from its exact bytes. Change one byte and the fingerprint changes. The drawing here is one fingerprint: two copies of the same file draw the same picture.</p>
-        <dl class="places">
-          <div class="place" data-place="s5">
-            <dt>On S5</dt>
-            <dd>Serey's own storage. Every file has a copy here, and it's the one Serey shows you.</dd>
-          </div>
-          <div class="place" data-place="arweave">
-            <dt>On Arweave</dt>
-            <dd>A public network that keeps files forever, with no delete. Posts saved with Forever have a copy here too.</dd>
-          </div>
-        </dl>
-        <p>Your browser downloads each copy and works out its fingerprint. Same fingerprint, same file. To check a file you have, pick it from your device; it is never uploaded.</p>
+        <p>Every file has a fingerprint, worked out from its exact bytes. Change one byte and the fingerprint changes.</p>
+        <p>Serey keeps every file on S5, its own storage. Posts saved with Forever are also kept on Arweave, a public network with no delete.</p>
+        <p>Your browser downloads each copy and works out its fingerprint again. Same fingerprint, same file. A file from your device is checked the same way, and is never uploaded.</p>
       </div>
+      <figure class="how-example" aria-hidden="true">
+        <figcaption>What a check looks like</figcaption>
+        <div class="copy-list">
+          <div class="copy-row" data-place="s5" data-state="ok">
+            <div class="copy-where"><strong>S5</strong><span>Serey's storage</span></div>
+            <span class="copy-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></span>
+            <div class="copy-state"><span class="pill ok"><span class="pill-dot"></span>Verified</span></div>
+          </div>
+          <div class="copy-row" data-place="arweave" data-state="ok">
+            <div class="copy-where"><strong>Arweave</strong><span>Kept forever</span></div>
+            <span class="copy-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></span>
+            <div class="copy-state"><span class="pill ok"><span class="pill-dot"></span>Verified</span></div>
+          </div>
+        </div>
+        <p>Both copies draw the same fingerprint, so they are the same file.</p>
+      </figure>
     </section>
 
     <div id="output" aria-live="polite"></div>

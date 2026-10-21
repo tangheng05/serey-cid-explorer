@@ -205,8 +205,8 @@ test('a post text from Arweave is checked against its SHA-256 and shown as plain
   await until(() => page.state('arweave') === 'ok', 'the text is verified');
   assert.ok(page.text().includes('Intact on Arweave'));
   assert.strictEqual(page.state('s5'), 'none', 'a post text has no S5 copy');
-  const shown = page.doc.querySelector('.doc-preview');
-  assert.strictEqual(shown.querySelector('p').textContent, 'Hello\n\nSecond line');
+  const shown = page.doc.querySelector('.reading .doc');
+  assert.deepStrictEqual([...shown.querySelectorAll('p')].map((p) => p.textContent), ['Hello', 'Second line'], 'one paragraph per paragraph; the repeated title is dropped');
   assert.ok(!shown.querySelector('img, b'), 'no HTML from the file reaches the page');
 });
 

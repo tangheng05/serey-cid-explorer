@@ -77,9 +77,8 @@ const onScroll = () => top.classList.toggle('scrolled', window.scrollY > 4);
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
-// The explainer's seal is drawn from a real file's fingerprint.
-const demo = document.getElementById('how-seal');
-if (demo) demo.append(seal(fromHex(demo.dataset.hash), 'A fingerprint, drawn'));
+// The explainer's example copies are drawn from a real file's fingerprint.
+document.querySelectorAll('.how-example [data-hash]').forEach((el) => el.append(seal(fromHex(el.dataset.hash))));
 
 // A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
 // A post opens as cid.serey.io/post/<account>/<permlink>; the box then shows the post's Serey link.

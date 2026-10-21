@@ -30,6 +30,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 export function renderPost(out, post, { signal, isCurrent }) {
   const run = limiter(2);
   const title = h('h2', { class: 'post-title' }, titleFromPermlink(post.permlink));
+  const verdict = h('h3', { class: 'verdict busy' }, 'Checking copies');
   const summary = h('p', { class: 'post-summary' }, 'Loading the files of this post…');
   const segments = h('div', { class: 'segments' });
   const head = h(
@@ -38,7 +39,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
     title,
     h('p', { class: 'post-by' }, 'A Serey post by ', h('strong', null, `@${post.author}`)),
     h('div', { class: 'post-links' }, external(postUrl(post), [icon('out'), 'Open on Serey'], 'chip-link'), external(explorerUrl(post), [icon('out'), 'Open in Serey Explorer'], 'chip-link')),
-    h('div', { class: 'post-progress' }, segments, summary),
+    h('div', { class: 'post-progress' }, verdict, summary, segments),
   );
   const list = h('div', { class: 'file-list' });
   const table = h(
@@ -59,6 +60,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
     const { textArweave } = await info;
     if (!isCurrent()) return;
     if (!rows.length && !textArweave) {
+      verdict.hidden = true;
       summary.textContent = 'Nothing to check.';
       out.append(problemCard('file', 'This post has no stored files', 'Text-only posts, and posts published before Serey stored files on S5, have nothing to check.'));
       return;
@@ -69,6 +71,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
     summarize();
   }).catch((e) => {
     if (!isCurrent()) return;
+    verdict.hidden = true;
     summary.textContent = 'Could not load this post.';
     // A network or cross-origin failure has no status; say so in words.
     const why = e && e.name === 'TypeError' ? "Serey's API could not be reached from this page" : (e.message || String(e));
@@ -154,7 +157,12 @@ export function renderPost(out, post, { signal, isCurrent }) {
         'div',
         { class: 'file-details-in' },
         h('div', { class: 'copy-list' }, copyRow(s5), copyRow(ar)),
-        h('a', { class: 'link file-record', href: r.href, target: '_blank', rel: 'noopener' }, 'Open the full record', icon('out')),
+        h(
+          'div',
+          { class: 'file-details-foot' },
+          h('p', null, 'Its fingerprint, every technical detail, and a check of a copy you have.'),
+          h('a', { class: 'btn small primary file-record', href: r.href, target: '_blank', rel: 'noopener' }, 'Open the full record', icon('out')),
+        ),
       ),
     );
     const el = h(
@@ -173,7 +181,9 @@ export function renderPost(out, post, { signal, isCurrent }) {
       toggle,
       panel,
     );
-    toggle.addEventListener('click', () => {
+    // The whole row opens its details, except its own buttons and links.
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.file-details, a, button:not(.file-toggle), input')) return;
       const open = !el.classList.contains('open');
       el.classList.toggle('open', open);
       toggle.setAttribute('aria-expanded', String(open));
@@ -244,5 +254,13 @@ export function renderPost(out, post, { signal, isCurrent }) {
     summary.textContent = `${what} ${line.charAt(0).toUpperCase()}${line.slice(1)}`;
     const done = !busy && all.every((c) => c.state === 'ok');
     summary.className = `post-summary ${done ? 'ok' : count(all, 'bad') ? 'bad' : ''}`;
+    const [tone, title] = busy ? ['busy', 'Checking copies']
+      : count(all, 'bad') ? ['bad', 'A copy does not match']
+        : done ? ['ok', 'All copies intact']
+          : count(all, 'waiting') ? ['neutral', 'Some files are not checked yet']
+            : ['warn', 'Some copies could not be checked'];
+    const mark = { ok: 'check', bad: 'x' }[tone];
+    verdict.className = `verdict ${tone}`;
+    fill(verdict, mark ? h('span', { class: 'verdict-icon' }, icon(mark)) : null, title);
   }
 }

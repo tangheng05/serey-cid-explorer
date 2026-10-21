@@ -240,7 +240,7 @@ export function copyCell(copy) {
     el.title = c.why || '';
     if (c.state === 'none') {
       pct = null;
-      fill(el, h('span', { class: 'cell-none' }, 'Not kept'));
+      fill(el, h('span', { class: 'pill none' }, 'Not kept'));
       return;
     }
     const s = statusPill(c);

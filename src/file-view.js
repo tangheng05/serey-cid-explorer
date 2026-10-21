@@ -13,25 +13,50 @@ export function releaseFile() {
   blobUrls = [];
 }
 
-// A stored post text is JSON with an HTML title and body; only their text is shown. A parsed document runs nothing.
+const BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre';
+const KIND = { LI: 'li', BLOCKQUOTE: 'quote', PRE: 'pre' };
+
+// A stored post text is JSON with an HTML title and body. Only their text is kept, as paragraphs,
+// headings and list items; a parsed document runs nothing and none of its markup reaches the page.
 export function readPost(bytes) {
   try {
     const doc = JSON.parse(new TextDecoder().decode(bytes));
-    const text = (html) => {
-      if (typeof html !== 'string') return '';
-      const d = new DOMParser().parseFromString(html, 'text/html');
-      d.querySelectorAll('br').forEach((n) => n.replaceWith('\n'));
-      d.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, blockquote, pre').forEach((n) => n.append('\n\n'));
-      return d.body.textContent.replace(/\n{3,}/g, '\n\n').trim();
-    };
-    const title = text(doc.title);
-    const body = text(doc.body);
-    if (!title && !body) return null;
+    const parse = (html) => new DOMParser().parseFromString(typeof html === 'string' ? html : '', 'text/html').body;
+    const clean = (text) => text.replace(/[^\S\n]+/g, ' ').replace(/ *\n */g, '\n').trim();
+    const title = clean(parse(doc.title).textContent).replace(/\n+/g, ' ');
+    const body = parse(doc.body);
+    body.querySelectorAll('br').forEach((n) => n.replaceWith('\n'));
+    // Only the innermost blocks, so a list inside a quote is read once.
+    let blocks = [...body.querySelectorAll(BLOCKS)]
+      .filter((n) => !n.querySelector(BLOCKS))
+      .map((n) => ({ kind: /^H\d$/.test(n.tagName) ? 'h' : KIND[n.tagName] || 'p', text: clean(n.textContent) }))
+      .filter((b) => b.text);
+    if (!blocks.length) blocks = clean(body.textContent).split(/\n{2,}/).filter(Boolean).map((text) => ({ kind: 'p', text }));
+    if (!title && !blocks.length) return null;
     // Notes repeat their first line as the title.
-    return { title: body.startsWith(title) ? '' : title, body };
+    const repeats = blocks.length && blocks[0].text.startsWith(title);
+    return { title: repeats ? '' : title, blocks };
   } catch {
     return null;
   }
+}
+
+const BLOCK_TAG = { h: 'h3', li: 'li', quote: 'blockquote', pre: 'pre', p: 'p' };
+// Long texts open folded, so the copies below stay in view.
+const LONG_TEXT = 1200;
+
+function readingView(post) {
+  const doc = h('article', { class: 'doc' }, post.title ? h('h2', { class: 'doc-title' }, post.title) : null, post.blocks.map((b) => h(BLOCK_TAG[b.kind], null, b.text)));
+  const long = post.blocks.reduce((n, b) => n + b.text.length, 0) > LONG_TEXT;
+  if (!long) return doc;
+  doc.classList.add('folded');
+  const toggle = h('button', { type: 'button', class: 'link doc-toggle', 'aria-expanded': 'false' }, 'Show the whole text');
+  toggle.addEventListener('click', () => {
+    const folded = doc.classList.toggle('folded');
+    toggle.setAttribute('aria-expanded', String(!folded));
+    toggle.textContent = folded ? 'Show the whole text' : 'Show less';
+  });
+  return [doc, toggle];
 }
 
 export const short = (text) => (text.length > 22 ? `${text.slice(0, 10)}…${text.slice(-8)}` : text);
@@ -87,7 +112,10 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
   let others = null;
   let previewed = false;
 
-  const media = h('div', { class: 'media' }, h('div', { class: 'media-empty' }, icon(isText ? 'file' : 'image'), h('p', null, 'Shown here once a copy is verified.')));
+  const placeholder = () => h('div', { class: 'media-empty' }, icon(isText ? 'file' : 'image'), h('p', null, 'Shown here once a copy is verified.'));
+  // A picture sits beside the verdict; a text gets a full-width panel to be read in.
+  const media = isText ? null : h('div', { class: 'media' }, placeholder());
+  const reading = isText ? h('div', { class: 'reading' }, h('h3', null, 'The post text'), h('div', { class: 'reading-body' }, placeholder())) : null;
   const kind = h('p', { class: 'record-kind' });
   const verdict = h('h2', { class: 'verdict' });
   const verdictSub = h('p', { class: 'verdict-sub' });
@@ -101,7 +129,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
     { class: 'card record' },
     h(
       'div',
-      { class: 'record-top' },
+      { class: isText ? 'record-top no-media' : 'record-top' },
       media,
       h(
         'div',
@@ -118,6 +146,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
         h('label', { class: 'btn' }, icon('shield'), 'Check a copy you have', fileInput),
       ),
     ),
+    reading,
     h('div', { class: 'copies' }, h('h3', null, 'Copies'), list),
     h('details', { class: 'tech' }, h('summary', null, 'Technical details', icon('chevron')), tech),
   );
@@ -150,7 +179,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
       const post = res.bytes && readPost(res.bytes);
       if (!post) return;
       previewed = true;
-      fill(media, h('article', { class: 'doc-preview' }, post.title ? h('h3', null, post.title) : null, h('p', null, post.body)));
+      fill(reading.querySelector('.reading-body'), readingView(post));
       return;
     }
     if (!res.kept) return;
