@@ -1,4 +1,6 @@
+import { sha256 } from '@noble/hashes/sha256';
 import { ARWEAVE_GATEWAY, ARWEAVE_GRAPHQL, SEREY_ARWEAVE_OWNERS } from './config.js';
+import { toHex } from './cid.js';
 
 const ID = /^[A-Za-z0-9_-]{43}$/;
 
@@ -79,4 +81,22 @@ export async function findCopies(cids, opts) {
     if (!ids.includes(tx.id)) ids.push(tx.id);
   }
   return found;
+}
+
+// A stored post text has no S5 copy; Serey tags it with its SHA-256 instead. '' when there is none.
+export function textSha(tx) {
+  const value = ((tx && tx.tags.find((t) => t.name === 'Content-SHA256')) || {}).value || '';
+  return /^[0-9a-f]{64}$/.test(value) ? value : '';
+}
+
+// Post texts are small; nothing bigger is downloaded as one.
+export const TEXT_MAX_BYTES = 1024 * 1024;
+
+export async function verifyText(id, expected, { signal, fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(arweaveUrl(id), { signal });
+  if (!res.ok) throw new Error(`Arweave answered ${res.status}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length > TEXT_MAX_BYTES) throw new Error('This file is too big to be a post text');
+  const gotHex = toHex(sha256(bytes));
+  return { ok: gotHex === expected, gotHex, bytes };
 }

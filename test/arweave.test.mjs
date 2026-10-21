@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { parseArweaveId, cleanTx, fetchTx, findCopies } from '../src/arweave.js';
+import { parseArweaveId, cleanTx, fetchTx, findCopies, textSha, verifyText } from '../src/arweave.js';
 
 const ID = 'idlHA5FknbCa9gyT23wn_aZ2Hw9--MdslRIR6yQN-uY';
 const CID = 'z2H78ykZ1s4ED35ukefijV9f4sRcjMmTMAS4BatAUarUyj6JkTE1';
@@ -64,4 +64,19 @@ test("only Serey's wallet counts as a copy: anyone can tag an upload with a CID"
 test('a failing network is an error, not an empty answer', async () => {
   await assert.rejects(fetchTx(ID, { fetchImpl: async () => new Response('x', { status: 503 }) }), /503/);
   await assert.rejects(fetchTx(ID, { fetchImpl: async () => new Response(JSON.stringify({ errors: [{}] })) }), /could not answer/);
+});
+
+// The post text Serey stored on Arweave for a real post, and the SHA-256 it was tagged with.
+const TEXT = '{"v":2,"title":"<p>Why is this important?</p>","body":"<p>Why is this important?</p>"}';
+
+test('a post text is checked against its Content-SHA256 tag', async () => {
+  const { createHash } = await import('node:crypto');
+  const sha = createHash('sha256').update(TEXT).digest('hex');
+  const tx = cleanTx({ ...NODE, tags: [{ name: 'Content-SHA256', value: sha }] });
+  assert.strictEqual(textSha(tx), sha);
+  assert.strictEqual(textSha(cleanTx({ ...NODE, tags: [{ name: 'Content-SHA256', value: 'not hex' }] })), '');
+  assert.strictEqual(textSha(null), '');
+  const serve = (body) => ({ fetchImpl: async () => new Response(body) });
+  assert.strictEqual((await verifyText(ID, sha, serve(TEXT))).ok, true);
+  assert.strictEqual((await verifyText(ID, sha, serve(`${TEXT} `))).ok, false, 'one byte changes the hash');
 });

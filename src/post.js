@@ -1,16 +1,15 @@
 import { parseCid } from './cid.js';
-import { fetchLocations } from './nodes.js';
-import { verifyUrl, sniffImage } from './verify.js';
+import { sniffImage } from './verify.js';
 import { fileSize } from './format.js';
-import { findCopies } from './arweave.js';
-import { SEREY_NODE, AUTO_VERIFY_MAX_BYTES, CONFIRM_ABOVE_BYTES } from './config.js';
-import { h, fill, icon, external, mono, row, pill, copyButton, withCopy, concat, expiryValue } from './ui.js';
+import { findCopies, fetchTx, textSha, TEXT_MAX_BYTES } from './arweave.js';
+import { h, fill, icon, external, mono, copyButton, concat } from './ui.js';
 import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl } from './serey.js';
+import { createCopy, copyRow, copyCell, limiter } from './copies.js';
+import { fromHex } from './seal.js';
+import { problemCard, short } from './file-view.js';
 
 // Pictures up to this size are kept after their check, to show as thumbnails.
 const THUMB_MAX_BYTES = 8 * 1024 * 1024;
-// How many files are checked at once.
-const PARALLEL = 2;
 
 let blobUrls = [];
 export function releasePost() {
@@ -18,317 +17,232 @@ export function releasePost() {
   blobUrls = [];
 }
 
-const short = (cid) => (cid.length > 22 ? `${cid.slice(0, 10)}…${cid.slice(-8)}` : cid);
 const titleFromPermlink = (p) => {
   const words = p.replace(/-/g, ' ').trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
-const KIND_ICON = { images: 'image', videos: 'play', audio: 'music' };
-const SUB = { file: 'Attached to the post', poster: 'Poster frame of the video' };
+const KIND_ICON = { images: 'image', videos: 'play', audio: 'music', text: 'file' };
+const SUB = { file: 'Attached to the post', poster: 'Poster frame of the video', text: 'The written post' };
+const BUSY = ['idle', 'looking', 'finding', 'queued', 'checking'];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-// The permanent copy on Arweave, opened on this site where it is checked.
-const arweaveLine = (id) => h('div', { class: 'file-cid file-ar' }, h('span', { class: 'file-cid-k' }, 'Arweave'), h('a', { class: 'mono link', href: `/${id}`, target: '_blank', rel: 'noopener' }, short(id)), copyButton(id));
-
-// The post's own text is kept on Arweave too; it has no S5 copy to check against.
-const textItem = (id) => h(
-  'article',
-  { class: 'file' },
-  h('div', { class: 'file-thumb' }, icon('file')),
-  h('div', { class: 'file-main' }, h('div', { class: 'file-name' }, h('strong', null, 'Post text')), h('div', { class: 'file-sub' }, 'The written post, kept permanently'), arweaveLine(id)),
-);
-
-// Every file of a Serey post on one page: each S5 content ID is found and checked in turn.
+// Every file of a Serey post, and its text, each with its copy on S5 and on Arweave.
 export function renderPost(out, post, { signal, isCurrent }) {
+  const run = limiter(2);
   const title = h('h2', { class: 'post-title' }, titleFromPermlink(post.permlink));
-  const summaryText = h('p', { class: 'post-summary' }, 'Loading the files of this post...');
+  const summary = h('p', { class: 'post-summary' }, 'Loading the files of this post…');
   const segments = h('div', { class: 'segments' });
-  const verifyAll = h('button', { type: 'button', class: 'btn primary', hidden: true }, icon('download'), 'Verify all');
-
   const head = h(
     'section',
     { class: 'card post-head' },
-    h('span', { class: 'eyebrow' }, 'Serey post'),
     title,
-    h('p', { class: 'post-by' }, 'by ', h('strong', null, `@${post.author}`)),
-    h(
-      'div',
-      { class: 'post-links' },
-      external(postUrl(post), [icon('out'), 'Open on Serey'], 'chip-link'),
-      external(explorerUrl(post), [icon('out'), 'Open in Serey Explorer'], 'chip-link'),
-    ),
-    h('div', { class: 'post-progress' }, segments, h('div', { class: 'post-progress-row' }, summaryText, verifyAll)),
+    h('p', { class: 'post-by' }, 'A Serey post by ', h('strong', null, `@${post.author}`)),
+    h('div', { class: 'post-links' }, external(postUrl(post), [icon('out'), 'Open on Serey'], 'chip-link'), external(explorerUrl(post), [icon('out'), 'Open in Serey Explorer'], 'chip-link')),
+    h('div', { class: 'post-progress' }, segments, summary),
   );
   const list = h('div', { class: 'file-list' });
-  const filesCard = h('section', { class: 'card files' }, h('header', { class: 'files-head' }, h('h2', null, 'Files'), h('span', { class: 'files-count' })), list);
+  const table = h(
+    'section',
+    { class: 'card files' },
+    h('div', { class: 'files-head', 'aria-hidden': 'true' }, h('span', null, 'File'), h('span', null, 'On S5'), h('span', null, 'On Arweave'), h('span')),
+    list,
+  );
   out.append(head);
 
+  const items = [];
   const info = fetchPostInfo(post, { signal });
   info.then(({ title: t }) => { if (t && isCurrent()) title.textContent = t; });
 
-  fetchPostMedia(post, { signal }).then((media) => {
+  fetchPostMedia(post, { signal }).then(async (media) => {
     if (!isCurrent()) return;
     const rows = postRows(media);
-    if (!rows.length) {
-      info.then(({ textArweave }) => {
-        if (!isCurrent()) return;
-        if (textArweave) {
-          summaryText.textContent = 'No files on S5. The post text is kept on Arweave.';
-          filesCard.querySelector('.files-count').textContent = '';
-          out.append(filesCard);
-          list.append(textItem(textArweave));
-          return;
-        }
-        summaryText.textContent = 'No files to check.';
-        out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('file')), h('div', null, h('h2', null, 'No files on S5 for this post'), h('p', null, 'Text-only posts, and posts published before Serey stored files on S5, have no content IDs to check.'))));
-      });
+    const { textArweave } = await info;
+    if (!isCurrent()) return;
+    if (!rows.length && !textArweave) {
+      summary.textContent = 'Nothing to check.';
+      out.append(problemCard('file', 'This post has no stored files', 'Text-only posts, and posts published before Serey stored files on S5, have nothing to check.'));
       return;
     }
-    filesCard.querySelector('.files-count').textContent = `${rows.length} ${rows.length === 1 ? 'file' : 'files'}`;
-    out.append(filesCard);
-    start(rows);
-    info.then(({ textArweave }) => { if (textArweave && isCurrent()) list.append(textItem(textArweave)); });
+    out.append(table);
+    addFiles(rows);
+    if (textArweave) addText(textArweave);
+    summarize();
   }).catch((e) => {
     if (!isCurrent()) return;
-    summaryText.textContent = 'Could not load this post.';
+    summary.textContent = 'Could not load this post.';
     // A network or cross-origin failure has no status; say so in words.
     const why = e && e.name === 'TypeError' ? "Serey's API could not be reached from this page" : (e.message || String(e));
-    out.append(h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon('alert')), h('div', null, h('h2', null, 'Could not load the files of this post'), h('p', null, `${why}. Check the link, or try again in a moment.`))));
+    out.append(problemCard('alert', 'Could not load the files of this post', `${why}. Check the link, or try again in a moment.`));
   });
 
-  function start(rows) {
-    const items = [];
+  function addFiles(rows) {
     let lastVideo = null;
     for (const r of rows) {
-      const item = fileItem(r);
+      const cid = parseCid(r.cid);
+      const fp = cid.ok ? { kind: 'blake3', hash: cid.hash, hashHex: cid.hashHex, size: cid.size } : { kind: 'blake3', size: 0 };
+      const keep = r.kind === 'images' && cid.ok && cid.size <= THUMB_MAX_BYTES ? THUMB_MAX_BYTES : 0;
+      const base = { fp, signal, isCurrent, run, keep };
+      const s5 = createCopy({ ...base, place: 's5', cid });
+      const ar = createCopy({ ...base, place: 'arweave' });
+      const item = fileItem({ ...r, size: cid.ok ? cid.size : null, id: r.cid, href: `/${encodeURIComponent(r.cid)}` }, s5, ar);
       if (r.kind === 'videos' && r.role === 'file') lastVideo = item;
       if (r.role === 'poster') item.videoItem = lastVideo;
-      items.push(item);
-      list.append(item.el);
+      if (!cid.ok) {
+        s5.set('invalid', cid.message);
+        ar.set('none');
+        continue;
+      }
+      s5.locate();
+      ar.set('looking');
     }
 
-    const queue = [];
-    let running = 0;
-    const pump = () => {
-      while (running < PARALLEL && queue.length && isCurrent()) {
-        const item = queue.shift();
-        running += 1;
-        item.check().finally(() => { running -= 1; pump(); });
-      }
-    };
-    const enqueue = (item) => { item.set('queued'); queue.push(item); pump(); };
+    // One query finds the Arweave copy of every file.
+    const byCid = new Map(items.filter((i) => i.cid).map((i) => [i.cid, i]));
+    findCopies([...byCid.keys()], { signal }).then((found) => {
+      if (!isCurrent()) return;
+      byCid.forEach((item, cid) => {
+        const [id] = found[cid] || [];
+        if (!id) {
+          item.ar.about = 'Only Forever posts are kept on Arweave.';
+          item.ar.set('none');
+          return;
+        }
+        item.ar.attach(id);
+        item.ar.auto();
+      });
+    }).catch((e) => {
+      if (!isCurrent()) return;
+      byCid.forEach((item) => { item.ar.retry = false; item.ar.set('failed', `Arweave did not answer (${e.message}).`); });
+    });
+  }
 
-    function summarize() {
-      const count = (s) => items.filter((i) => i.state === s).length;
-      const ok = count('ok');
-      const bad = count('bad');
-      const waiting = count('waiting');
-      const busy = items.length - ok - bad - waiting - count('failed') - count('missing') - count('invalid');
-      // One segment per file, made once; only their colour changes.
-      if (segments.children.length !== items.length) fill(segments, items.map(() => h('span', { class: 'seg' })));
-      items.forEach((i, n) => { segments.children[n].className = `seg ${i.state}`; });
-      let text;
-      if (busy) text = `Checking files... ${items.length - busy} of ${items.length} done`;
-      else if (ok === items.length) text = `All ${items.length} ${items.length === 1 ? 'file' : 'files'} verified`;
-      else {
-        const parts = [`${ok} of ${items.length} verified`];
-        if (bad) parts.push(`${bad} ${bad === 1 ? 'does' : 'do'} not match`);
-        if (waiting) parts.push(`${waiting} waiting for you`);
-        const other = items.length - ok - bad - waiting;
-        if (other) parts.push(`${other} could not be checked`);
-        text = parts.join(' · ');
+  // The post's text is kept on Arweave only, checked against the SHA-256 it was tagged with.
+  function addText(id) {
+    const fp = { kind: 'sha256', size: 0 };
+    const s5 = createCopy({ fp, place: 's5', signal, isCurrent });
+    const ar = createCopy({ fp, place: 'arweave', arweaveId: id, signal, isCurrent, run });
+    const item = fileItem({ kind: 'text', role: 'text', label: 'Post text', id, href: `/${id}` }, s5, ar);
+    s5.about = 'Post texts are kept on Arweave only.';
+    s5.set('none');
+    ar.set('looking');
+    fetchTx(id, { signal }).then((tx) => {
+      if (!isCurrent()) return;
+      const sha = textSha(tx);
+      if (!sha || (tx.size || 0) > TEXT_MAX_BYTES) {
+        ar.retry = false;
+        ar.set('failed', 'This upload carries no SHA-256 to check it against.');
+        return;
       }
-      summaryText.textContent = text;
-      summaryText.className = `post-summary ${!busy && ok === items.length ? 'ok' : bad ? 'bad' : ''}`;
-      verifyAll.hidden = busy > 0 || waiting < 2;
-    }
+      Object.assign(fp, { hash: fromHex(sha), hashHex: sha, size: tx.size || 0 });
+      item.setSize(tx.size);
+      ar.auto();
+    }).catch((e) => {
+      if (!isCurrent()) return;
+      ar.retry = false;
+      ar.set('failed', `Arweave did not answer (${e.message}).`);
+    });
+  }
 
-    verifyAll.addEventListener('click', () => {
-      const big = items.filter((i) => i.state === 'waiting');
-      const total = big.reduce((n, i) => n + i.size, 0);
-      if (total > CONFIRM_ABOVE_BYTES && !window.confirm(`This downloads ${fileSize(total)}. Check all of it?`)) return;
-      big.forEach(enqueue);
+  function fileItem(r, s5, ar) {
+    const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
+    const sizeText = h('span', { class: 'file-size' }, r.size != null ? fileSize(r.size) : '');
+    const toggle = h('button', { type: 'button', class: 'file-toggle', 'aria-expanded': 'false', 'aria-label': `Details of ${r.label}` }, icon('chevron'));
+    const panel = h(
+      'div',
+      { class: 'file-details' },
+      h(
+        'div',
+        { class: 'file-details-in' },
+        h('div', { class: 'copy-list' }, copyRow(s5), copyRow(ar)),
+        h('a', { class: 'link file-record', href: r.href, target: '_blank', rel: 'noopener' }, 'Open the full record', icon('out')),
+      ),
+    );
+    const el = h(
+      'article',
+      { class: 'file' },
+      thumb,
+      h(
+        'div',
+        { class: 'file-main' },
+        h('div', { class: 'file-name' }, h('strong', null, r.label), sizeText),
+        h('div', { class: 'file-sub' }, SUB[r.role]),
+        h('div', { class: 'file-cid' }, mono(short(r.id)), copyButton(r.id)),
+      ),
+      h('div', { class: 'file-copy' }, h('span', { class: 'file-copy-k' }, 'On S5'), copyCell(s5)),
+      h('div', { class: 'file-copy' }, h('span', { class: 'file-copy-k' }, 'On Arweave'), copyCell(ar)),
+      toggle,
+      panel,
+    );
+    toggle.addEventListener('click', () => {
+      const open = !el.classList.contains('open');
+      el.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', String(open));
     });
 
-    function fileItem(r) {
-      const cid = parseCid(r.cid);
-      const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
-      const status = h('div', { class: 'file-status' });
-      const reason = h('div', { class: 'file-reason', hidden: true });
-      const arweave = h('div', { class: 'file-ar-slot' });
-      const sizeText = cid.ok ? fileSize(cid.size) : '';
-      const toggle = h('button', { type: 'button', class: 'link file-toggle', 'aria-expanded': 'false' }, 'Details', icon('chevron'));
-      const panelBody = h('div', { class: 'file-details-body' });
-      const panel = h('div', { class: 'file-details' }, h('div', { class: 'file-details-in' }, panelBody));
-      const el = h(
-        'article',
-        { class: 'file' },
-        thumb,
-        h(
-          'div',
-          { class: 'file-main' },
-          h('div', { class: 'file-name' }, h('strong', null, r.label), sizeText ? h('span', { class: 'file-size' }, sizeText) : null),
-          h('div', { class: 'file-sub' }, SUB[r.role]),
-          h('div', { class: 'file-cid' }, h('span', { class: 'file-cid-k' }, 'S5'), mono(short(r.cid)), copyButton(r.cid)),
-          arweave,
-          reason,
-        ),
-        h('div', { class: 'file-side' }, status, toggle),
-        panel,
-      );
-
-      // Details open under the row: everything the single-ID page would show about this file.
-      function renderDetails() {
-        if (!el.classList.contains('open')) return;
-        const compare = (label, expected, got) => row(label, h('span', { class: 'value cmp' }, h('span', { class: 'cmp-k' }, 'Expected'), expected, h('span', { class: 'cmp-k' }, 'Got'), got));
-        fill(
-          panelBody,
-          row('Content ID', withCopy(r.cid)),
-          cid.ok ? [
-            row('Size', `${fileSize(cid.size)} (${cid.size.toLocaleString('en-US')} bytes)`),
-            row('Hash function', 'BLAKE3, 256 bit'),
-            row('Hash', withCopy(cid.hashHex)),
-          ] : null,
-          item.url
-            ? row('Address', h('span', { class: 'value copyable' }, h('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer', class: 'addr' }, item.url), copyButton(item.url)))
-            : row('Address', item.looking ? `Asking the ${SEREY_NODE.name}...` : 'Not known'),
-          item.expiry ? row('Offer', expiryValue(item.expiry, () => lookUp())) : null,
-          item.nodeId ? row('Node ID', mono(item.nodeId)) : null,
-          item.res ? [
-            compare('Checked hash', mono(cid.hashHex), mono(item.res.gotHashHex)),
-            compare('Checked size', `${cid.size.toLocaleString('en-US')} bytes`, `${item.res.gotBytes.toLocaleString('en-US')} bytes`),
-          ] : null,
-          h('div', { class: 'file-details-foot' }, h('a', { class: 'link', href: `/${encodeURIComponent(r.cid)}`, target: '_blank', rel: 'noopener' }, 'Open the full page', icon('out'))),
-        );
+    const item = {
+      el,
+      s5,
+      ar,
+      cid: r.role !== 'text' && parseCid(r.id).ok ? r.id : null,
+      videoItem: null,
+      setSize(n) { if (n != null) sizeText.textContent = fileSize(n); },
+      setThumb(url) {
+        fill(thumb, h('img', { src: url, alt: '' }));
+        thumb.classList.add('has-img');
+      },
+    };
+    const onChange = (copy, progress) => {
+      if (progress) return;
+      el.dataset.state = [s5, ar].some((c) => c.state === 'bad') ? 'bad' : '';
+      if (copy.state === 'ok' && copy.res.kept && !thumb.classList.contains('has-img')) {
+        const bytes = concat(copy.res.kept);
+        const type = sniffImage(bytes);
+        if (type) {
+          const u = URL.createObjectURL(new Blob([bytes], { type }));
+          blobUrls.push(u);
+          item.setThumb(u);
+          if (item.videoItem && !item.videoItem.el.querySelector('.file-thumb img')) item.videoItem.setThumb(u);
+        }
       }
+      summarize();
+    };
+    s5.on(onChange);
+    ar.on(onChange);
+    items.push(item);
+    list.append(el);
+    return item;
+  }
 
-      // Where the file is kept, for a file not checked yet (or to refresh an expired offer).
-      async function lookUp() {
-        if (!cid.ok || item.looking) return;
-        item.looking = true;
-        renderDetails();
-        try {
-          remember(await fetchLocations(SEREY_NODE, cid.key, { signal }));
-        } catch { /* the row's own check reports node trouble */ }
-        item.looking = false;
-        if (isCurrent()) renderDetails();
-      }
+  // One sentence for the whole post, and one segment per copy.
+  function summarize() {
+    if (!items.length) return;
+    const files = items.filter((i) => i.cid !== null || i.s5.state === 'invalid');
+    const text = items.some((i) => !files.includes(i));
+    const s5 = items.map((i) => i.s5).filter((c) => c.state !== 'none');
+    const ar = items.map((i) => i.ar).filter((c) => c.state !== 'none');
+    const all = [...s5, ...ar];
+    if (segments.children.length !== all.length) fill(segments, all.map(() => h('span', { class: 'seg' })));
+    all.forEach((c, n) => { segments.children[n].className = `seg ${c.state}`; });
 
-      function remember(locations) {
-        const loc = locations.find((l) => l.parts.length);
-        item.url = loc ? loc.parts[0] : null;
-        item.expiry = loc ? loc.expiry : null;
-        item.nodeId = loc ? loc.nodeId : '';
-      }
-
-      toggle.addEventListener('click', () => {
-        const open = !el.classList.contains('open');
-        el.classList.toggle('open', open);
-        toggle.setAttribute('aria-expanded', String(open));
-        if (!open) return;
-        renderDetails();
-        if (!item.url && !item.looking && item.state !== 'finding') lookUp();
-      });
-
-      const item = {
-        el,
-        state: 'queued',
-        size: cid.ok ? cid.size : 0,
-        videoItem: null,
-        showArweave: (id) => fill(arweave, arweaveLine(id)),
-        setThumb(url) {
-          fill(thumb, h('img', { src: url, alt: '' }));
-          thumb.classList.add('has-img');
-        },
-        set(state, pct, why) {
-          // Progress only moves the row's progress line and the number; nothing is rebuilt, so nothing blinks.
-          el.style.setProperty('--p', `${pct || 0}%`);
-          if (state === item.state && state === 'checking' && item.pctText) {
-            item.pctText.textContent = pct == null ? '' : ` ${pct}%`;
-            return;
-          }
-          item.state = state;
-          el.dataset.state = state;
-          reason.hidden = !why;
-          reason.textContent = why || '';
-          item.pctText = null;
-          const verify = h('button', { type: 'button', class: 'btn small' }, 'Verify');
-          verify.addEventListener('click', () => {
-            if (item.size > CONFIRM_ABOVE_BYTES && !window.confirm(`This file is ${fileSize(item.size)}. Download it to check it?`)) return;
-            enqueue(item);
-          });
-          const view = {
-            queued: pill('neutral', 'Waiting'),
-            finding: pill('busy', 'Finding'),
-            checking: (() => {
-              item.pctText = h('span', { class: 'pct' }, pct == null ? '' : ` ${pct}%`);
-              return pill('busy', ['Checking', item.pctText]);
-            })(),
-            ok: pill('ok', 'Verified'),
-            bad: pill('bad', 'Does not match'),
-            failed: [pill('warn', 'Could not check'), verify],
-            missing: pill('warn', 'Not found'),
-            invalid: pill('warn', 'Not a valid CID'),
-            waiting: verify,
-          }[state];
-          fill(status, view);
-          summarize();
-        },
-        async check() {
-          if (!cid.ok) { item.set('invalid', null, cid.message); return; }
-          try {
-            item.set('finding');
-            const locations = await fetchLocations(SEREY_NODE, cid.key, { signal });
-            remember(locations);
-            renderDetails();
-            const url = locations.flatMap((l) => l.parts)[0];
-            if (!url) { item.set('missing', null, `The ${SEREY_NODE.name} has no address for this file.`); return; }
-            item.set('checking', 0);
-            const keep = r.kind === 'images' && cid.size <= THUMB_MAX_BYTES ? THUMB_MAX_BYTES : 0;
-            let last = -1;
-            const res = await verifyUrl(url, cid, {
-              signal,
-              keep,
-              onProgress: (done) => {
-                const p = Math.min(100, Math.floor((done / Math.max(cid.size, 1)) * 100));
-                if (p !== last) { last = p; item.set('checking', p); }
-              },
-            });
-            if (!isCurrent()) return;
-            item.res = res;
-            renderDetails();
-            if (!res.ok) { item.set('bad', null, 'The downloaded bytes are not the file this ID names.'); return; }
-            item.set('ok');
-            if (res.kept) {
-              const bytes = concat(res.kept);
-              const type = sniffImage(bytes);
-              if (type) {
-                const u = URL.createObjectURL(new Blob([bytes], { type }));
-                blobUrls.push(u);
-                item.setThumb(u);
-                if (item.videoItem && !item.videoItem.el.querySelector('.file-thumb img')) item.videoItem.setThumb(u);
-              }
-            }
-          } catch (e) {
-            if (signal.aborted || !isCurrent()) return;
-            const msg = e && e.name === 'TypeError' ? 'The file could not be downloaded' : (e.message || String(e));
-            if (/ 404$/.test(msg)) item.set('missing', null, `The ${SEREY_NODE.name} does not know this file.`);
-            else item.set('failed', null, `${msg}. Try again.`);
-          }
-        },
-      };
-      if (!cid.ok) item.set('invalid', null, cid.message);
-      else if (cid.size > AUTO_VERIFY_MAX_BYTES) item.set('waiting');
-      return item;
+    const what = `${files.length ? plural(files.length, 'file', 'files') : 'The post text'}${files.length && text ? ' and the post text' : ''}.`;
+    const busy = all.filter((c) => BUSY.includes(c.state)).length;
+    const count = (list2, state) => list2.filter((c) => c.state === state).length;
+    let line;
+    if (busy) {
+      line = `Checking copies… ${all.length - busy} of ${all.length} done.`;
+    } else {
+      const parts = [];
+      if (s5.length) parts.push(count(s5, 'ok') === s5.length ? 'All intact on S5' : `${count(s5, 'ok')} of ${s5.length} verified on S5`);
+      if (ar.length) parts.push(count(ar, 'ok') === ar.length ? `${plural(ar.length, 'copy', 'copies')} kept on Arweave, all intact` : `${plural(ar.length, 'copy', 'copies')} kept on Arweave, ${count(ar, 'ok')} verified`);
+      else parts.push('none kept on Arweave');
+      const bad = count(all, 'bad');
+      const waiting = count(all, 'waiting');
+      if (bad) parts.push(`${bad} ${bad === 1 ? 'does' : 'do'} not match`);
+      if (waiting) parts.push(`${waiting} waiting for you`);
+      line = `${parts.join('; ')}.`;
     }
-
-    items.filter((i) => i.state === 'queued').forEach(enqueue);
-    summarize();
-
-    // One query finds the Arweave copy of every file; a failure only leaves the rows without it.
-    const byCid = Object.fromEntries(items.map((i, n) => [rows[n].cid, i]));
-    findCopies(Object.keys(byCid), { signal }).then((found) => {
-      if (!isCurrent()) return;
-      for (const [cid, [id]] of Object.entries(found)) byCid[cid].showArweave(id);
-    }).catch(() => {});
+    summary.textContent = `${what} ${line.charAt(0).toUpperCase()}${line.slice(1)}`;
+    const done = !busy && all.every((c) => c.state === 'ok');
+    summary.className = `post-summary ${done ? 'ok' : count(all, 'bad') ? 'bad' : ''}`;
   }
 }

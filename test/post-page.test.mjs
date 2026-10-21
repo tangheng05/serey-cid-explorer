@@ -1,75 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { readFile } from 'node:fs/promises';
-import { JSDOM } from 'jsdom';
-import { build } from 'esbuild';
-import { blake3 } from '@noble/hashes/blake3';
-import { buildRawCid, parseCid } from '../src/cid.js';
+import { createHash } from 'node:crypto';
+import { parseCid } from '../src/cid.js';
+import { network, open, until, png, cidOf, POST, SEREY_WALLET } from './helpers.mjs';
 
-// The real bundle in a simulated browser; Serey's API, the S5 node and storage are faked.
-const bundle = (await build({ entryPoints: ['src/main.js'], bundle: true, write: false, format: 'iife', target: 'es2020' })).outputFiles[0].text;
-const html = await readFile('index.html', 'utf8');
-
-const png = (seed) => Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Array.from({ length: 1500 }, (_, i) => (i * seed) % 256)]);
-const cidOf = (bytes, size = bytes.length) => buildRawCid(blake3(bytes), size);
-const POST = 'https://serey.io/sereyexplorer/explorer/@chhaylin/bruce-lee-and-daoism';
-
-// files: CID -> bytes (or a status number); media: what Serey's API answers (or a status number).
-function network({ media, files, title = 'Bruce Lee and Daoism', arweave = {}, textArweave = null }) {
-  const calls = [];
-  const keyOf = Object.fromEntries(Object.keys(files).map((c) => [parseCid(c).key, c]));
-  const fetchFake = async (url) => {
-    const u = String(url);
-    calls.push(u);
-    if (u.includes('/api/v2/media-proof/posts/chhaylin/bruce-lee-and-daoism')) {
-      return typeof media === 'number' ? new Response('', { status: media }) : new Response(JSON.stringify({ media }));
-    }
-    if (u.includes('/api/v1/sereyweb/getDetailByPermlink')) {
-      return new Response(JSON.stringify({ content: { title }, forever: textArweave ? { document: { arweave_id: textArweave } } : null }));
-    }
-    if (u === 'https://arweave.net/graphql') {
-      const edges = Object.entries(arweave).map(([cid, id]) => ({ node: { id, owner: { address: 'OWbotbFOnhyFMY309nf7DyM_ZA_YNWX408bA_9aoM6w' }, tags: [{ name: 'S5-CID', value: cid }] } }));
-      return new Response(JSON.stringify({ data: { transactions: { edges } } }));
-    }
-    if (u.startsWith('https://s5.serey.io/s5/debug/storage_locations/')) {
-      const key = u.split('/').pop();
-      return keyOf[key] ? new Response(JSON.stringify({ locations: [{ type: 3, parts: [`https://storage.serey.io/blob/1/${key}`], expiry: Math.floor(Date.now() / 1000) + 3600 }] })) : new Response('', { status: 404 });
-    }
-    if (u.startsWith('https://storage.serey.io/blob/1/')) {
-      const body = files[keyOf[u.split('/').pop()]];
-      return typeof body === 'number' ? new Response('', { status: body }) : new Response(body);
-    }
-    throw new Error(`unexpected request: ${u}`);
-  };
-  return { fetchFake, calls };
-}
-
-async function open(net, { path = '' } = {}) {
-  const dom = new JSDOM(html, { url: `https://cid.serey.io/${path}`, runScripts: 'outside-only', pretendToBeVisual: true });
-  const { window } = dom;
-  window.setInterval = () => 0;
-  window.fetch = net.fetchFake;
-  window.URL.createObjectURL = () => 'blob:thumb';
-  window.URL.revokeObjectURL = () => {};
-  window.eval(bundle);
-  const doc = window.document;
-  return {
-    window,
-    doc,
-    text: () => doc.getElementById('output').textContent,
-    type: (value) => { const el = doc.getElementById('cid-input'); el.value = value; el.dispatchEvent(new window.Event('input')); },
-    rows: () => [...doc.querySelectorAll('.file')],
-  };
-}
-
-async function until(check, what, ms = 4000) {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    if (check()) return;
-    await new Promise((r) => setTimeout(r, 10));
-  }
-  assert.fail(`timed out waiting for: ${what}`);
-}
+const cell = (row, place) => row.querySelector(`.cell-copy[data-place='${place}']`);
 
 test('pasting a post link checks every file of the post on one page', async () => {
   const a = png(13);
@@ -88,32 +23,27 @@ test('pasting a post link checks every file of the post on one page', async () =
   assert.strictEqual(page.window.location.pathname, '/post/chhaylin/bruce-lee-and-daoism');
   await until(() => page.rows().length === 4, 'one row per content ID');
   assert.deepStrictEqual(page.rows().map((r) => r.querySelector('strong').textContent), ['Image 1', 'Image 2', 'Video', 'Video poster']);
-  await until(() => page.text().includes('3 of 4 verified'), 'the small files were checked');
+  await until(() => page.text().includes('3 of 4 verified on S5'), 'the small files were checked');
   assert.ok(page.text().includes('1 waiting for you'));
+  assert.ok(page.text().includes('none kept on Arweave'));
   assert.ok(page.text().includes('Bruce Lee and Daoism'), 'the post title is shown');
   const videoRow = page.rows()[2];
-  assert.strictEqual(videoRow.dataset.state, 'waiting');
-  assert.ok(videoRow.querySelector('.file-status button').textContent.includes('Verify'), 'a big file waits for a click');
+  assert.strictEqual(cell(videoRow, 's5').dataset.state, 'waiting');
+  assert.ok(cell(videoRow, 's5').querySelector('button').textContent.includes('Check'), 'a big file waits for a click');
   assert.ok(!net.calls.some((u) => u.endsWith(parseCid(video).key) && u.startsWith('https://storage')), 'the big file was not downloaded');
   assert.ok(videoRow.querySelector('.file-thumb img'), 'the video row borrows its verified poster as a thumbnail');
 
-  // Details open under the row instead of leaving the page.
+  // Details open under the row: each copy in full, and a link to the file's own record.
   const first = page.rows()[0];
   first.querySelector('.file-toggle').click();
   assert.ok(first.classList.contains('open'));
   assert.strictEqual(first.querySelector('.file-toggle').getAttribute('aria-expanded'), 'true');
-  const panel = first.querySelector('.file-details').textContent;
-  assert.ok(panel.includes(cidOf(a)), 'the full content ID');
-  assert.ok(panel.includes(parseCid(cidOf(a)).hashHex), 'the hash');
-  assert.ok(panel.includes(`https://storage.serey.io/blob/1/${parseCid(cidOf(a)).key}`), 'where it is stored');
-  assert.ok(panel.includes('Checked hash'), 'the comparison from the check');
-  assert.strictEqual(first.querySelector('.file-details-foot a').getAttribute('href'), `/${cidOf(a)}`);
+  const panel = first.querySelector('.file-details');
+  assert.ok(panel.textContent.includes('storage.serey.io'), 'where it is stored');
+  assert.ok(panel.querySelector(".copy-row[data-place='s5'] .seal"), 'the fingerprint of the checked bytes');
+  assert.strictEqual(panel.querySelector('.file-record').getAttribute('href'), `/${cidOf(a)}`);
   first.querySelector('.file-toggle').click();
   assert.ok(!first.classList.contains('open'), 'a second click closes it');
-
-  // A big file not checked yet still learns where it is kept when its details open.
-  videoRow.querySelector('.file-toggle').click();
-  await until(() => videoRow.querySelector('.file-details').textContent.includes('Expected') === false && videoRow.querySelector('.file-details a.addr'), 'the address of an unchecked file');
 });
 
 test('a file whose bytes do not match is called out in its row', async () => {
@@ -124,6 +54,7 @@ test('a file whose bytes do not match is called out in its row', async () => {
   page.type('@chhaylin/bruce-lee-and-daoism');
   await until(() => page.rows()[0] && page.rows()[0].dataset.state === 'bad', 'the mismatch is shown');
   assert.ok(page.text().includes('Does not match'));
+  assert.ok(page.text().includes('1 does not match'));
   assert.strictEqual(page.doc.querySelector('.file-thumb img'), null, 'no thumbnail from bytes that failed');
 });
 
@@ -131,26 +62,26 @@ test('a post page opened from its own address shows the Serey link in the box', 
   const a = png(13);
   const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: { [cidOf(a)]: a } }), { path: 'post/chhaylin/bruce-lee-and-daoism' });
   assert.strictEqual(page.doc.getElementById('cid-input').value, 'https://serey.io/authors/chhaylin/bruce-lee-and-daoism');
-  await until(() => page.text().includes('All 1 file verified'), 'the file was checked');
+  await until(() => page.text().includes('1 file. All intact on S5'), 'the file was checked');
 });
 
-test('a post the API cannot load, or with no files, says so plainly', async () => {
-  const failing = await open(network({ media: 500, files: {} }));
+test('a post the API cannot load, or with nothing stored, says so plainly', async () => {
+  const failing = await open(network({ media: 500 }));
   failing.type(POST);
   await until(() => failing.text().includes('Could not load the files of this post'), 'the failure is shown');
   assert.ok(failing.text().includes('500'));
 
-  const empty = await open(network({ media: [], files: {} }));
+  const empty = await open(network({ media: [] }));
   empty.type(POST);
-  await until(() => empty.text().includes('No files on S5 for this post'), 'the empty post is explained');
+  await until(() => empty.text().includes('This post has no stored files'), 'the empty post is explained');
 });
 
-test('a CID still opens the single-file page', async () => {
+test('a CID still opens the file record, not a post', async () => {
   const a = png(13);
-  const page = await open(network({ media: [], files: { [cidOf(a)]: a } }));
+  const page = await open(network({ files: { [cidOf(a)]: a } }));
   page.type(cidOf(a));
   assert.strictEqual(page.doc.querySelector('.file'), null);
-  await until(() => page.doc.querySelector('.result'), 'the single-file result');
+  await until(() => page.doc.querySelector('.record'), 'the file record');
 });
 
 test('a file that cannot be downloaded says why and can be tried again', async () => {
@@ -158,26 +89,28 @@ test('a file that cannot be downloaded says why and can be tried again', async (
   const files = { [cidOf(a)]: 503 };
   const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files }));
   page.type(POST);
-  await until(() => page.rows()[0] && page.rows()[0].dataset.state === 'failed', 'the failure is shown');
-  assert.ok(page.text().includes('The file server answered 503'), 'the reason is visible, not only on hover');
+  await until(() => page.rows()[0] && cell(page.rows()[0], 's5').dataset.state === 'failed', 'the failure is shown');
+  assert.ok(cell(page.rows()[0], 's5').title.includes('The file server answered 503'));
+  page.rows()[0].querySelector('.file-toggle').click();
+  assert.ok(page.rows()[0].querySelector('.file-details').textContent.includes('The file server answered 503'), 'the reason is visible, not only on hover');
   files[cidOf(a)] = a;
-  page.rows()[0].querySelector('.file-status button').click();
-  await until(() => page.rows()[0].dataset.state === 'ok', 'the retry verified the file');
-  assert.ok(page.text().includes('All 1 file verified'));
+  cell(page.rows()[0], 's5').querySelector('button').click();
+  await until(() => cell(page.rows()[0], 's5').dataset.state === 'ok', 'the retry verified the file');
+  await until(() => page.text().includes('All intact on S5'), 'the summary caught up');
 });
 
 test('a file the node does not know is marked Not found', async () => {
   const a = png(13);
-  const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }], files: {} }));
+  const page = await open(network({ media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }] }));
   page.type(POST);
-  await until(() => page.rows()[0] && page.rows()[0].dataset.state === 'missing', 'the missing file is shown');
+  await until(() => page.rows()[0] && cell(page.rows()[0], 's5').dataset.state === 'missing', 'the missing file is shown');
   assert.ok(page.text().includes('Not found'));
 });
 
 test('an unreachable API is explained in words, and titles lose their HTML entities', async () => {
-  const net = network({ media: [], files: {} });
+  const net = network();
   const real = net.fetchFake;
-  net.fetchFake = async (url) => { if (String(url).includes('media-proof')) throw new TypeError('Failed to fetch'); return real(url); };
+  net.fetchFake = async (url, init) => { if (String(url).includes('media-proof')) throw new TypeError('Failed to fetch'); return real(url, init); };
   const page = await open(net);
   page.type(POST);
   await until(() => page.text().includes("Serey's API could not be reached"), 'the reason is in words');
@@ -189,35 +122,42 @@ test('an unreachable API is explained in words, and titles lose their HTML entit
   assert.strictEqual(titled.doc.querySelector('.post-title b'), null);
 });
 
-test('a post lists the Arweave copy of each file and of its text beside the S5 one', async () => {
+test('each row shows its copy on S5 and on Arweave side by side, the text included', async () => {
   const a = png(13);
   const b = png(7);
   const AR_A = 'A'.repeat(43);
   const AR_TEXT = 'T'.repeat(43);
+  const text = '{"v":2,"title":"","body":"<p>Hello</p>"}';
+  const sha = createHash('sha256').update(text).digest('hex');
   const net = network({
     media: [{ file: 'a.jpg', kind: 'images', s5_cid: cidOf(a) }, { file: 'b.jpg', kind: 'images', s5_cid: cidOf(b) }],
     files: { [cidOf(a)]: a, [cidOf(b)]: b },
-    arweave: { [cidOf(a)]: AR_A },
+    copies: { [cidOf(a)]: AR_A },
+    arweaveFiles: { [AR_A]: a, [AR_TEXT]: text },
     textArweave: AR_TEXT,
+    txs: { [AR_TEXT]: { id: AR_TEXT, owner: { address: SEREY_WALLET }, data: { size: String(text.length) }, tags: [{ name: 'Content-SHA256', value: sha }] } },
   });
   const page = await open(net);
   page.type(POST);
   await until(() => page.rows().length === 3, 'two files and the post text');
-  const [first, second, text] = page.rows();
-  await until(() => first.querySelector('.file-ar a'), 'the Arweave copy of the first file');
-  assert.strictEqual(first.querySelector('.file-ar a').getAttribute('href'), `/${AR_A}`);
-  assert.ok(first.textContent.includes('S5'), 'the S5 line stays');
-  assert.ok(!second.querySelector('.file-ar'), 'a file with no Arweave copy shows none');
-  assert.strictEqual(text.querySelector('strong').textContent, 'Post text');
-  assert.strictEqual(text.querySelector('.file-ar a').getAttribute('href'), `/${AR_TEXT}`);
-  await until(() => page.text().includes('All 2 files verified'), 'the summary counts only the S5 files');
+  const [first, second, row] = page.rows();
+  await until(() => cell(first, 'arweave').dataset.state === 'ok', 'the Arweave copy is checked against the same fingerprint');
+  await until(() => cell(second, 'arweave').dataset.state === 'none', 'a file with no Arweave copy says so');
+  assert.ok(cell(second, 'arweave').textContent.includes('Not kept'));
+  assert.strictEqual(row.querySelector('strong').textContent, 'Post text');
+  assert.strictEqual(cell(row, 's5').dataset.state, 'none', 'a post text has no S5 copy');
+  await until(() => cell(row, 'arweave').dataset.state === 'ok', 'the text is checked against its SHA-256');
+  await until(() => page.text().includes('2 files and the post text. All intact on S5; 2 copies kept on Arweave, all intact.'), 'one sentence for the post');
+  first.querySelector('.file-toggle').click();
+  assert.ok(first.querySelector(".file-details .copy-row[data-place='arweave'] a").href.endsWith(AR_A), 'the Arweave copy can be opened');
+  assert.strictEqual(row.querySelector('.file-record').getAttribute('href'), `/${AR_TEXT}`);
 });
 
-test('a text-only Forever post lists its text on Arweave instead of "no files"', async () => {
+test('a text-only Forever post lists its text instead of "no files"', async () => {
   const AR_TEXT = 'T'.repeat(43);
-  const page = await open(network({ media: [], files: {}, textArweave: AR_TEXT }));
+  const page = await open(network({ textArweave: AR_TEXT }));
   page.type(POST);
   await until(() => page.rows().length === 1, 'the post text row');
-  assert.strictEqual(page.rows()[0].querySelector('.file-ar a').getAttribute('href'), `/${AR_TEXT}`);
-  assert.ok(!page.text().includes('No files on S5 for this post'));
+  assert.ok(!page.text().includes('This post has no stored files'));
+  assert.ok(page.text().startsWith('Bruce Lee and Daoism') || page.text().includes('The post text.'));
 });

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob:; media-src blob: https:; connect-src https:; base-uri 'none'; form-action 'none'">
-  <title>Serey CID Explorer: S5 and Arweave</title>
-  <meta name="description" content="Look up and verify the content ID (CID) of any file stored on Serey's S5 node or kept on Arweave.">
+  <title>Serey CID Explorer</title>
+  <meta name="description" content="Check that a file on Serey is intact: its copy on Serey's S5 storage and, for Forever posts, its permanent copy on Arweave.">
   <meta name="theme-color" content="#0e0e52">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/style.css?v=__BUILD__">
@@ -19,7 +19,7 @@
           <source media="(prefers-reduced-motion: reduce)" srcset="/serey-logo.png">
           <img src="/serey-logo.gif" alt="Serey">
         </picture>
-        <span class="title">CID Explorer · S5 &amp; Arweave</span>
+        <span class="title">CID Explorer</span>
       </a>
       <nav class="nav" aria-label="Serey">
         <a href="https://serey.io/sereyexplorer/" target="_blank" rel="noopener noreferrer">Serey Explorer</a>
@@ -30,41 +30,43 @@
 
   <section class="hero">
     <div class="hero-in">
-      <h1>Verify a file on Serey</h1>
-      <p class="lede">Paste a content ID, an Arweave ID, or a post link to check all its files at once.</p>
+      <h1>Check that a file on Serey is intact</h1>
       <div class="search">
         <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-        <label class="visually-hidden" for="cid-input">Content ID</label>
-        <input id="cid-input" type="text" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a CID, an Arweave ID or a Serey post link">
+        <label class="visually-hidden" for="cid-input">Post link, S5 file ID or Arweave ID</label>
+        <input id="cid-input" type="text" autofocus autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a post link, an S5 file ID or an Arweave ID" aria-describedby="recognised">
         <button id="clear" class="search-clear" type="button" aria-label="Clear" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
         </button>
+      </div>
+      <p id="recognised" class="recognised" aria-live="polite"></p>
+      <div class="examples">
+        <span>Try one:</span>
+        <button type="button" class="example" data-example="https://serey.io/authors/chhaylin/why-is-this-important-because-financial-autonomy-shouldnt-be">A post with a photo</button>
+        <button type="button" class="example" data-example="z2H78ykZ1s4ED35ukefijV9f4sRcjMmTMAS4BatAUarUyj6JkTE1">An S5 file ID</button>
+        <button type="button" class="example" data-example="idlHA5FknbCa9gyT23wn_aZ2Hw9--MdslRIR6yQN-uY">An Arweave ID</button>
       </div>
     </div>
   </section>
 
   <main>
-    <section id="intro">
-      <ol class="steps">
-        <li class="step">
-          <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h11v11H9z"></path><path d="M5 15H4V4h11v1"></path></svg></span>
-          <span class="step-n">Step 1</span>
-          <h2>Copy an ID or a link</h2>
-          <p>Open a post in the <a href="https://serey.io/sereyexplorer/" target="_blank" rel="noopener noreferrer">Serey Explorer</a> and copy its link, or an S5 or Arweave ID from Proof of storage.</p>
-        </li>
-        <li class="step">
-          <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><path d="M5 14h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z"></path><path d="M7 7h.01"></path><path d="M7 17h.01"></path></svg></span>
-          <span class="step-n">Step 2</span>
-          <h2>See where it's stored</h2>
-          <p>We ask Serey's S5 node, S5 Garden and Arweave where the file is kept.</p>
-        </li>
-        <li class="step">
-          <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg></span>
-          <span class="step-n">Step 3</span>
-          <h2>Verify the bytes</h2>
-          <p>Your browser hashes the file and compares it with the ID. An Arweave copy is checked against its S5 CID.</p>
-        </li>
-      </ol>
+    <section id="intro" class="how">
+      <div id="how-seal" class="how-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></div>
+      <div class="how-text">
+        <h2>How a check works</h2>
+        <p>Every file has a fingerprint, worked out from its exact bytes. Change one byte and the fingerprint changes. The drawing here is one fingerprint: two copies of the same file draw the same picture.</p>
+        <dl class="places">
+          <div class="place" data-place="s5">
+            <dt>On S5</dt>
+            <dd>Serey's own storage. Every file has a copy here, and it's the one Serey shows you.</dd>
+          </div>
+          <div class="place" data-place="arweave">
+            <dt>On Arweave</dt>
+            <dd>A public network that keeps files forever, with no delete. Posts saved with Forever have a copy here too.</dd>
+          </div>
+        </dl>
+        <p>Your browser downloads each copy and works out its fingerprint. Same fingerprint, same file. To check a file you have, pick it from your device; it is never uploaded.</p>
+      </div>
     </section>
 
     <div id="output" aria-live="polite"></div>
