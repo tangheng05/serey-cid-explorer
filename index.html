@@ -50,30 +50,26 @@
   </section>
 
   <main>
-    <section id="intro" class="how">
-      <div class="how-text">
-        <h2>How a check works</h2>
-        <p>Every file has a fingerprint, worked out from its exact bytes. Change one byte and the fingerprint changes.</p>
-        <p>Serey keeps every file on S5, its own storage. Posts saved with Forever are also kept on Arweave, a public network with no delete.</p>
-        <p>Your browser downloads each copy and works out its fingerprint again. Same fingerprint, same file. A file from your device is checked the same way, and is never uploaded.</p>
-      </div>
-      <figure class="how-example" aria-hidden="true">
-        <figcaption>What a check looks like</figcaption>
-        <div class="copy-list">
-          <div class="copy-row" data-place="s5" data-state="ok">
-            <div class="copy-where"><strong>S5</strong><span>Serey's storage</span></div>
-            <span class="copy-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></span>
-            <div class="copy-state"><span class="pill ok"><span class="pill-dot"></span>Verified</span></div>
-          </div>
-          <div class="copy-row" data-place="arweave" data-state="ok">
-            <div class="copy-where"><strong>Arweave</strong><span>Kept forever</span></div>
-            <span class="copy-seal" data-hash="7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce"></span>
-            <div class="copy-state"><span class="pill ok"><span class="pill-dot"></span>Verified</span></div>
-          </div>
-        </div>
-        <p>Both copies draw the same fingerprint, so they are the same file.</p>
-      </figure>
-    </section>
+    <ol id="intro" class="steps">
+      <li class="step">
+        <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h11v11H9z"></path><path d="M5 15H4V4h11v1"></path></svg></span>
+        <span class="step-n">Step 1</span>
+        <h2>Paste a link or an ID</h2>
+        <p>A Serey post link, an S5 file ID, or an Arweave ID. Copy one from a post in the <a href="https://serey.io/sereyexplorer/" target="_blank" rel="noopener noreferrer">Serey Explorer</a>.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path><path d="M5 14h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z"></path><path d="M7 7h.01"></path><path d="M7 17h.01"></path></svg></span>
+        <span class="step-n">Step 2</span>
+        <h2>We find every copy</h2>
+        <p>On S5, Serey's own storage, and on Arweave, where posts saved with Forever are kept for good.</p>
+      </li>
+      <li class="step">
+        <span class="step-icon"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg></span>
+        <span class="step-n">Step 3</span>
+        <h2>Your browser checks them</h2>
+        <p>It downloads each copy and compares its fingerprint with the file's. Same fingerprint, same file.</p>
+      </li>
+    </ol>
 
     <div id="output" aria-live="polite"></div>
   </main>

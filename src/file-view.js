@@ -5,7 +5,6 @@ import { fileSize, relativeTime } from './format.js';
 import { SEREY_NODE, OTHER_NODES, PREVIEW_MAX_BYTES, ARWEAVE_EXPLORER_URL } from './config.js';
 import { h, fill, icon, mono, row, pill, copyButton, withCopy, concat, expiryValue, section } from './ui.js';
 import { createCopy, copyRow, limiter, PLACES } from './copies.js';
-import { seal } from './seal.js';
 
 let blobUrls = [];
 export function releaseFile() {
@@ -162,6 +161,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
   const list = h('div', { class: 'copy-list' });
   const tech = h('div', { class: 'tech-body' });
   const fileInput = h('input', { type: 'file', class: 'visually-hidden' });
+  const copiesBlock = h('div', { class: 'copies' }, h('h3', null, 'Copies'), list);
   const idText = cid ? cid.forms.base58 : fp.hashHex;
 
   const record = h(
@@ -170,7 +170,7 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
     h(
       'div',
       { class: isText ? 'record-top is-text' : 'record-top' },
-      media || reading,
+      media,
       h(
         'div',
         { class: 'record-summary' },
@@ -180,13 +180,16 @@ export function renderFile(out, { fp, cid, arweave, pasted, signal, isCurrent })
         h(
           'div',
           { class: 'fingerprint' },
-          seal(fp.hash, 'Fingerprint of this file'),
-          h('div', null, h('span', { class: 'fingerprint-label' }, cid ? 'Fingerprint, as its S5 ID' : 'Fingerprint, SHA-256'), h('span', { class: 'value copyable' }, mono(short(idText)), copyButton(idText))),
+          h('span', { class: 'fingerprint-label' }, cid ? 'Fingerprint (S5 ID)' : 'Fingerprint (SHA-256)'),
+          h('span', { class: 'value copyable' }, mono(short(idText)), copyButton(idText)),
         ),
         h('label', { class: 'btn' }, icon('shield'), 'Check a copy you have', fileInput),
+        // Beside a picture the copies fill the column next to it; a text needs that room to be read.
+        isText ? null : copiesBlock,
       ),
     ),
-    h('div', { class: 'copies' }, h('h3', null, 'Copies'), list),
+    reading,
+    isText ? copiesBlock : null,
     h('details', { class: 'tech' }, h('summary', null, 'Technical details', icon('chevron')), tech),
   );
   out.append(record);

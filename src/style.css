@@ -65,10 +65,6 @@ a:hover { text-decoration: underline; }
 .muted { color: var(--muted); }
 .mono { font-family: var(--mono); font-size: .8rem; color: var(--ink-2); overflow-wrap: anywhere; }
 
-/* The fingerprint seal: one picture per hash, so matching copies look the same */
-.seal { display: block; flex: none; width: 40px; height: 40px; padding: 2px; color: var(--navy); background: #fff; border: 1px solid var(--line); border-radius: 9px; }
-.seal rect { fill: currentColor; }
-
 /* Header */
 .top { position: sticky; top: 0; z-index: 10; background: rgba(255, 255, 255, .94); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
 .top.scrolled { box-shadow: 0 6px 18px rgba(15, 21, 53, .06); }
@@ -122,16 +118,15 @@ body.has-result .hero h1, body.has-result .examples { display: none; }
 /* Page */
 main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20px 16px; }
 
-/* How a check works: three short paragraphs beside an example of a result */
-.how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 400px); gap: 40px; align-items: center; max-width: 900px; margin: 16px auto 0; }
-.how h2 { margin-bottom: 10px; font-size: 1.25rem; font-weight: 700; color: var(--navy); }
-.how-text p { max-width: 52ch; color: var(--ink-2); }
-.how-text p + p { margin-top: 10px; }
-.how-example { margin: 0; padding: 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
-.how-example figcaption { margin-bottom: 12px; color: var(--muted); font-size: .84rem; font-weight: 600; }
-.how-example .copy-row { grid-template-columns: minmax(0, 1fr) 34px auto; }
-.how-example .copy-seal .seal { animation: none; }
-.how-example > p { margin-top: 12px; color: var(--muted); font-size: .86rem; }
+/* Three steps, because a check is a sequence */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; max-width: 940px; margin: 8px auto 0; padding: 0; list-style: none; }
+.step { padding: 22px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.step-icon { display: grid; place-items: center; width: 40px; height: 40px; color: var(--s5); background: var(--s5-50); border-radius: 11px; }
+.step-icon .icon { width: 20px; height: 20px; }
+.step-n { display: block; margin-top: 16px; color: var(--muted); font-size: .8rem; font-weight: 600; }
+.step h2 { margin: 2px 0 6px; font-size: 1rem; font-weight: 700; color: var(--navy); }
+.step p { color: var(--ink-2); font-size: .9rem; line-height: 1.55; }
+.step a { font-weight: 600; }
 
 /* Cards */
 .card { margin-top: 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 1px 2px rgba(15, 21, 53, .04); overflow: hidden; }
@@ -154,15 +149,19 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .media.has-preview { min-height: 0; background: none; border: 0; border-radius: 0; }
 .preview { display: grid; place-items: center; width: 100%; }
 .preview img, .preview video { display: block; max-width: 100%; max-height: 440px; border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 21, 53, .08), 0 8px 24px rgba(15, 21, 53, .10); }
-/* A text is the main column, with the verdict beside it */
-.record-top.is-text { grid-template-columns: minmax(0, 1fr) minmax(0, 260px); }
+/* A text: the verdict runs across the top, its fingerprint and check to the right */
+.record-top.is-text { grid-template-columns: minmax(0, 1fr); }
+.record-top.is-text .record-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 32px; align-items: center; }
+.record-top.is-text .record-summary > :not(.fingerprint):not(.btn) { grid-column: 1; }
+.record-top.is-text .fingerprint { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin: 0; }
+.record-top.is-text .record-summary > .btn { grid-column: 2; grid-row: 3; justify-self: stretch; }
 
 /* A post text, set for reading */
-.reading { min-width: 0; }
+.reading { padding: 0 26px 22px; }
 .reading h3 { margin-bottom: 10px; font-size: 1rem; font-weight: 700; color: var(--navy); }
 .reading-body { padding: 26px 30px; background: var(--paper); border: 1px solid var(--line-soft); border-radius: 12px; }
 .reading-body .media-empty { padding: 8px; }
-.doc { position: relative; max-width: 68ch; color: var(--ink); font-size: 1rem; line-height: 1.7; }
+.doc { position: relative; max-width: 68ch; margin: 0 auto; color: var(--ink); font-size: 1rem; line-height: 1.7; }
 .doc-title { margin-bottom: 14px; font-size: 1.3rem; line-height: 1.3; font-weight: 750; letter-spacing: -.01em; color: var(--navy); }
 .doc h3 { margin: 22px 0 6px; font-size: 1.05rem; font-weight: 700; color: var(--navy); }
 .doc p, .doc pre, .doc blockquote { margin: 0 0 14px; white-space: pre-line; overflow-wrap: anywhere; }
@@ -172,7 +171,7 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .doc > :last-child { margin-bottom: 0; }
 .doc.folded { max-height: 22rem; overflow: hidden; }
 .doc.folded::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 5rem; background: linear-gradient(rgba(246, 247, 251, 0), var(--paper)); }
-.doc-toggle { margin-top: 12px; }
+.doc-toggle { display: flex; width: 100%; max-width: 68ch; margin: 12px auto 0; }
 
 .record-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
 .record-kind { color: var(--muted); font-size: .9rem; font-weight: 500; }
@@ -185,12 +184,13 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .verdict.bad .verdict-icon { background: var(--bad); }
 .verdict-icon .icon { width: 16px; height: 16px; stroke-width: 2.6; }
 .verdict-sub { max-width: 60ch; color: var(--ink-2); }
-.fingerprint { display: flex; align-items: center; gap: 12px; margin: 6px 0 4px; }
-.fingerprint .seal { width: 52px; height: 52px; }
+.fingerprint { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 4px; }
 .fingerprint-label { display: block; color: var(--muted); font-size: .8rem; }
 
 /* Copies: one row per place, each in its own colour */
 .copies { padding: 4px 26px 22px; }
+.record-summary .copies { align-self: stretch; margin-top: 14px; padding: 18px 0 0; border-top: 1px solid var(--line-soft); }
+.record-summary .copy-row { grid-template-columns: minmax(0, 140px) minmax(0, 1fr) auto; padding: 10px 12px; }
 .copies h3, .tech summary { font-size: 1rem; font-weight: 700; color: var(--navy); }
 .copies h3 { margin-bottom: 10px; }
 .copy-list { display: grid; gap: 10px; }
@@ -198,7 +198,7 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
   --place: var(--s5);
   position: relative;
   display: grid;
-  grid-template-columns: 220px 34px minmax(0, 1fr) auto;
+  grid-template-columns: 220px minmax(0, 1fr) auto;
   gap: 4px 16px;
   align-items: center;
   padding: 12px 16px;
@@ -217,11 +217,7 @@ main { flex: 1; width: 100%; max-width: 980px; margin: 0 auto; padding: 28px 20p
 .copy-where strong { color: var(--place); }
 .copy-row[data-state='none'] .copy-where strong { color: var(--muted); }
 .copy-where > span { color: var(--muted); font-size: .84rem; }
-.pasted { margin-left: 8px; white-space: nowrap; padding: 1px 7px; color: var(--ink-2); font-size: .72rem; font-weight: 600; vertical-align: 1px; background: var(--line-soft); border-radius: 6px; }
-.copy-seal { display: grid; place-items: center; width: 34px; height: 34px; }
-.copy-seal .seal { width: 34px; height: 34px; padding: 1px; border-radius: 7px; animation: settle .45s cubic-bezier(.2, .8, .2, 1) both; }
-.copy-row[data-state='bad'] .copy-seal .seal { color: var(--bad); border-color: var(--bad-line); }
-@keyframes settle { from { opacity: 0; transform: scale(.6) rotate(-8deg); } to { opacity: 1; transform: none; } }
+.copy-where > .pasted { align-self: flex-start; margin-top: 4px; white-space: nowrap; padding: 1px 7px; color: var(--ink-2); font-size: .72rem; font-weight: 600; vertical-align: 1px; background: var(--line-soft); border-radius: 6px; }
 .copy-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 .copy-meta { min-width: 0; color: var(--muted); font-size: .86rem; overflow-wrap: anywhere; }
 .copy-actions { display: flex; gap: 8px; }
@@ -357,14 +353,18 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
 .foot-links { display: flex; gap: 20px; font-weight: 600; }
 
 @media (max-width: 760px) {
-  .how { grid-template-columns: 1fr; gap: 20px; }
+  .steps { grid-template-columns: 1fr; gap: 10px; }
+  .step { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; padding: 16px; }
+  .step-icon { grid-row: span 3; }
+  .step-n { margin-top: 0; }
   .record-top { grid-template-columns: 1fr; gap: 20px; padding: 18px; }
   .media { min-height: 160px; }
-  .record-top.is-text { grid-template-columns: minmax(0, 1fr); }
-  .record-top.is-text .record-summary { order: -1; }
+  .record-top.is-text .record-summary { display: flex; align-items: flex-start; }
+  .record-top.is-text .fingerprint { align-self: flex-start; }
+  .reading { padding: 0 18px 18px; }
   .reading-body { padding: 18px; }
   .copies { padding: 4px 18px 18px; }
-  .copy-row { grid-template-columns: minmax(0, 1fr) 34px; padding: 12px 14px; }
+  .copy-row, .record-summary .copy-row { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
   .copy-state, .copy-actions { grid-column: 1 / -1; }
   .tech summary { padding: 14px 18px; }
   .tech-body { padding: 0 18px 12px; }

@@ -95,6 +95,7 @@ export function b64urlDecode(str) {
   }
 }
 
+export const fromHex = (hex) => Uint8Array.from(hex.match(/../g) || [], (b) => parseInt(b, 16));
 export const toHex = (bytes) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 export function equalBytes(a, b) {

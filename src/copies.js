@@ -6,7 +6,6 @@ import { toHex } from './cid.js';
 import { fileSize } from './format.js';
 import { SEREY_NODE, AUTO_VERIFY_MAX_BYTES, CONFIRM_ABOVE_BYTES } from './config.js';
 import { h, fill, icon, pill } from './ui.js';
-import { seal, fromHex } from './seal.js';
 
 /*
 | A file has one fingerprint and up to three copies: on S5 (Serey's storage),
@@ -186,23 +185,20 @@ function metaFor(copy) {
   return copy.host || '';
 }
 
-// One copy as a row of the record: where, its fingerprint as checked, its state, and what to do.
+// One copy as a row of the record: where it is, its state, and what to do.
 export function copyRow(copy) {
   const place = PLACES[copy.place];
-  const sealBox = h('span', { class: 'copy-seal' });
   const status = h('div', { class: 'copy-status' });
   const meta = h('p', { class: 'copy-meta' });
   const actions = h('div', { class: 'copy-actions' });
   const el = h(
     'div',
     { class: 'copy-row', 'data-place': copy.place },
-    h('div', { class: 'copy-where' }, h('strong', null, place.name, copy.pasted ? h('span', { class: 'pasted' }, 'You pasted this') : null), h('span', null, place.about)),
-    sealBox,
+    h('div', { class: 'copy-where' }, h('strong', null, place.name), h('span', null, place.about), copy.pasted ? h('span', { class: 'pasted' }, 'You pasted this') : null),
     h('div', { class: 'copy-state' }, status, meta),
     actions,
   );
   let pct = null;
-  let shown = '';
 
   function paint(c, progress) {
     el.style.setProperty('--p', `${c.pct}%`);
@@ -215,11 +211,6 @@ export function copyRow(copy) {
     pct = s.pct;
     fill(status, s.el);
     meta.textContent = metaFor(c);
-    const got = c.res && (c.state === 'ok' || c.state === 'bad') ? c.res.gotHex : '';
-    if (got !== shown) {
-      shown = got;
-      fill(sealBox, got ? seal(fromHex(got), `Fingerprint of the ${place.name} copy`) : null);
-    }
     fill(actions, actionFor(c), c.url && c.place !== 'local' ? h('a', { class: 'btn small ghost', href: c.url, target: '_blank', rel: 'noopener noreferrer' }, icon('out'), 'Open') : null);
   }
   copy.on(paint);

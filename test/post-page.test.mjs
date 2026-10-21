@@ -40,7 +40,7 @@ test('pasting a post link checks every file of the post on one page', async () =
   assert.strictEqual(first.querySelector('.file-toggle').getAttribute('aria-expanded'), 'true');
   const panel = first.querySelector('.file-details');
   assert.ok(panel.textContent.includes('storage.serey.io'), 'where it is stored');
-  assert.ok(panel.querySelector(".copy-row[data-place='s5'] .seal"), 'the fingerprint of the checked bytes');
+  assert.strictEqual(panel.querySelector(".copy-row[data-place='s5']").dataset.state, 'ok', 'the S5 copy in full');
   assert.strictEqual(panel.querySelector('.file-record').getAttribute('href'), `/${cidOf(a)}`);
   first.querySelector('.file-toggle').click();
   assert.ok(!first.classList.contains('open'), 'a second click closes it');

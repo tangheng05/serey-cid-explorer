@@ -51,7 +51,6 @@ test('a small file is checked on its own, proving the bytes and showing a pictur
   await until(() => page.state('s5') === 'ok', 'the check finished without a click');
   await until(() => page.state('arweave') === 'none', 'no Arweave copy was found');
   assert.ok(page.text().includes('Intact on S5'));
-  assert.ok(page.copy('s5').querySelector('.seal'), 'the checked bytes draw their fingerprint');
   assert.strictEqual(page.doc.querySelector('.preview img').src, 'blob:preview');
   assert.ok(page.copy('arweave').textContent.includes('Only Forever posts are kept on Arweave'));
   await until(() => page.text().includes('No answer'), 'a silent other node is reported, not fatal');
@@ -74,8 +73,8 @@ test('bytes that do not match are called out, with no picture', async () => {
   assert.ok(page.doc.querySelector('.verdict.bad'));
   assert.ok(page.text().includes('The S5 copy is NOT this file'));
   assert.strictEqual(page.doc.querySelector('.preview img'), null, 'never draw bytes that failed the check');
-  const drawn = page.copy('s5').querySelector('.seal').innerHTML;
-  assert.notStrictEqual(drawn, page.doc.querySelector('.fingerprint .seal').innerHTML, 'the copy draws a different fingerprint');
+  assert.strictEqual(page.state('s5'), 'bad');
+  assert.ok(page.copy('s5').textContent.includes('Does not match'), 'the copy itself says so');
 });
 
 test('a file server error is a failed check, not a mismatch, and can be tried again', async () => {
@@ -180,7 +179,8 @@ test("a file kept on Arweave shows both copies, each checked against the same fi
   const page = await open(network({ files: { [cid]: PNG }, copies: { [cid]: AR }, arweaveFiles: { [AR]: PNG } }), { hash: cid });
   await until(() => page.state('arweave') === 'ok' && page.state('s5') === 'ok', 'both copies verified');
   assert.ok(page.text().includes('Intact in both copies'));
-  assert.strictEqual(page.copy('s5').querySelector('.seal').innerHTML, page.copy('arweave').querySelector('.seal').innerHTML, 'the same bytes draw the same fingerprint');
+  page.doc.querySelector('.tech').open = true;
+  assert.ok(page.text().includes('S5 copy') && page.text().includes('Arweave copy'), 'each check is listed against the same fingerprint');
   assert.strictEqual(page.copy('arweave').querySelector('a').href, `https://arweave.net/${AR}`);
 });
 

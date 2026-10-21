@@ -1,19 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { sealCells, fromHex } from '../src/seal.js';
 import { classify } from '../src/resolve.js';
-
-const HASH = fromHex('7277588bfd24e5844feb9626b3dd4b3bf94068f6016809386e59cc50ecc13dce');
-
-test('a fingerprint always draws the same seal, mirrored, and one changed bit draws another', () => {
-  const cells = sealCells(HASH);
-  assert.deepStrictEqual(sealCells(HASH), cells);
-  const key = (c) => c.map(([x, y]) => `${x},${y}`).sort().join(' ');
-  assert.strictEqual(key(cells), key(cells.map(([x, y]) => [4 - x, y])), 'left and right mirror each other');
-  const other = HASH.slice();
-  other[0] ^= 1;
-  assert.notStrictEqual(key(sealCells(other)), key(cells));
-});
 
 test('what was pasted is named before anything is asked', () => {
   assert.deepStrictEqual(classify('  '), { kind: 'empty', label: '' });

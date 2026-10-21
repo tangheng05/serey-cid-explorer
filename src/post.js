@@ -5,7 +5,7 @@ import { findCopies, fetchTx, textSha, TEXT_MAX_BYTES } from './arweave.js';
 import { h, fill, icon, external, mono, copyButton, concat } from './ui.js';
 import { fetchPostMedia, fetchPostInfo, postRows, postUrl, explorerUrl } from './serey.js';
 import { createCopy, copyRow, copyCell, limiter } from './copies.js';
-import { fromHex } from './seal.js';
+import { fromHex } from './cid.js';
 import { problemCard, short, techSections } from './file-view.js';
 
 // Pictures up to this size are kept after their check, to show as thumbnails.
