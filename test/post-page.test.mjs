@@ -177,9 +177,8 @@ test('an opened row shows the technical details right there, asking Arweave once
   await until(() => page.rows()[0] && cell(page.rows()[0], 'arweave').dataset.state === 'ok', 'both copies checked');
   const row = page.rows()[0];
   row.querySelector('.file-main').click();
-  const tech = row.querySelector('.tech.inline');
-  tech.open = true;
-  tech.dispatchEvent(new page.window.Event('toggle'));
+  row.querySelector('.tech-toggle').click();
+  const tech = row.querySelector('.file-details .tech-body');
   await until(() => tech.textContent.includes("Serey's wallet"), 'the Arweave transaction is shown');
   const text = tech.textContent;
   assert.ok(text.includes(parseCid(cidOf(a)).hashHex), 'the fingerprint');

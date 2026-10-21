@@ -149,8 +149,8 @@ export function renderPost(out, post, { signal, isCurrent }) {
 
   function fileItem(r, s5, ar) {
     const thumb = h('div', { class: 'file-thumb' }, icon(KIND_ICON[r.kind] || 'file'));
-    const techBody = h('div', { class: 'tech-body' });
-    const tech = h('details', { class: 'tech inline' }, h('summary', null, 'Technical details', icon('chevron')), techBody);
+    const techBody = h('div', { class: 'tech-body', hidden: true });
+    const techToggle = h('button', { type: 'button', class: 'link tech-toggle', 'aria-expanded': 'false' }, 'Technical details', icon('chevron'));
     const sizeText = h('span', { class: 'file-size' }, r.size != null ? fileSize(r.size) : '');
     const toggle = h('button', { type: 'button', class: 'file-toggle', 'aria-expanded': 'false', 'aria-label': `Details of ${r.label}` }, icon('chevron'));
     const panel = h(
@@ -160,13 +160,13 @@ export function renderPost(out, post, { signal, isCurrent }) {
         'div',
         { class: 'file-details-in' },
         h('div', { class: 'copy-list' }, copyRow(s5), copyRow(ar)),
-        tech,
         h(
           'div',
           { class: 'file-details-foot' },
-          h('p', null, 'The full record adds a large preview, every ID form and tag, and a check of a copy you have.'),
-          h('a', { class: 'btn small primary file-record', href: r.href, target: '_blank', rel: 'noopener' }, 'Open the full record', icon('out')),
+          techToggle,
+          h('a', { class: 'btn small primary file-record', href: r.href, target: '_blank', rel: 'noopener', title: 'A large preview, every ID form and tag, and a check of a copy you have' }, 'Open the full record', icon('out')),
         ),
+        techBody,
       ),
     );
     const el = h(
@@ -203,7 +203,7 @@ export function renderPost(out, post, { signal, isCurrent }) {
       setSize(n) { if (n != null) sizeText.textContent = fileSize(n); },
       // Drawn only while open; what Arweave says about the copy is asked for the first time it is.
       paintTech() {
-        if (!tech.open) return;
+        if (techBody.hidden) return;
         fill(techBody, techSections({ fp: r.fp, cid: r.cid, copies: [s5, ar], tx: item.tx, full: false }));
         if (!item.tx && ar.arweaveId && !item.askedTx) {
           item.askedTx = true;
@@ -215,7 +215,11 @@ export function renderPost(out, post, { signal, isCurrent }) {
         thumb.classList.add('has-img');
       },
     };
-    tech.addEventListener('toggle', () => item.paintTech());
+    techToggle.addEventListener('click', () => {
+      techBody.hidden = !techBody.hidden;
+      techToggle.setAttribute('aria-expanded', String(!techBody.hidden));
+      item.paintTech();
+    });
     const onChange = (copy, progress) => {
       if (progress) return;
       item.paintTech();

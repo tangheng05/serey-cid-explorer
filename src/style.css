@@ -337,13 +337,18 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
 .file.open .file-toggle .icon { transform: rotate(180deg); }
 .file-details { display: none; grid-column: 1 / -1; }
 .file.open .file-details { display: block; }
-.file-details-in { display: grid; gap: 12px; margin-top: 14px; padding: 14px; background: var(--paper); border-radius: 12px; }
-.tech.inline { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-.tech.inline summary { padding: 12px 16px; font-size: .95rem; }
-.tech.inline .tech-body { padding: 0 16px 8px; }
-.file-details-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 4px 2px 0; }
-.file-details-foot p { color: var(--muted); font-size: .86rem; }
+.file-details-in { margin-top: 14px; padding: 6px 16px 12px; background: var(--paper); border-radius: 12px; }
+/* Inside an opened row the copies are plain lines, not cards */
+.file-details .copy-row { padding: 10px 0 10px 14px; background: none; border: 0; border-left: 3px solid var(--place); border-radius: 0; }
+.file-details .copy-row[data-state='none'] { border-left-color: var(--line); }
+.file-details .copy-row[data-state='bad'] { background: var(--bad-bg); }
+.file-details .copy-list { gap: 6px; padding: 8px 0 12px; border-bottom: 1px solid var(--line); }
+.file-details-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding-top: 12px; }
 .file-record .icon { width: 14px; height: 14px; }
+.tech-toggle { color: var(--ink-2); }
+.tech-toggle .icon { width: 16px; height: 16px; transition: transform .2s ease; }
+.tech-toggle[aria-expanded='true'] .icon { transform: rotate(180deg); }
+.file-details .tech-body { margin-top: 8px; padding: 0; }
 
 /* Footer */
 .foot { margin-top: 40px; border-top: 1px solid var(--line); }
@@ -363,8 +368,6 @@ label.btn:focus-within { outline: 3px solid rgba(25, 43, 194, .4); outline-offse
   .copy-state, .copy-actions { grid-column: 1 / -1; }
   .tech summary { padding: 14px 18px; }
   .tech-body { padding: 0 18px 12px; }
-  .tech.inline summary { padding: 12px 14px; }
-  .tech.inline .tech-body { padding: 0 14px 8px; }
   .row { grid-template-columns: 1fr; gap: 2px; }
   .files-head { display: none; }
   .file { grid-template-columns: 52px minmax(0, 1fr) 32px; gap: 10px 14px; padding: 14px 16px; }
