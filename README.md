@@ -19,13 +19,25 @@ names, with nothing taken on the operator's word.
 ## How the check works
 
 - An S5 CID carries the file's BLAKE3 hash and size. The download is streamed
-  through BLAKE3 and compared, so large files are never held in memory.
+  through BLAKE3 and stops as soon as it runs past that size. Only files small
+  enough to preview (see `PREVIEW_MAX_BYTES`) are kept in memory.
 - An Arweave copy has no hash of its own. Serey tags each upload with the S5
   CID of the same file, so the Arweave bytes are checked against that CID.
-  Only uploads signed by Serey's wallet are listed.
+  Only uploads signed by Serey's wallet count; anyone can write the same tags.
 - A post's text lives on Arweave only and is checked against its
   `Content-SHA256` tag.
 - Only verified bytes are ever previewed.
+
+## What a check proves
+
+- **An S5 CID:** the bytes are exactly the file the CID names. This is pure
+  maths and needs no trust in anyone.
+- **An Arweave copy:** the bytes match the fingerprint in its tags, and the
+  page relies on the arweave.net gateway for which wallet signed the upload
+  and what its tags say.
+- **That the file is Serey's:** the page can show a file is intact, not who
+  made it. Authorship is recorded on Serey's own chain and shown in the
+  [Serey Explorer](https://serey.io/sereyexplorer/).
 
 Everything runs in the visitor's browser. There is no backend, and the page's
 CSP allows no inline script. Nodes, gateways and the Serey API are treated as
@@ -41,7 +53,8 @@ and previews, are in [`src/config.js`](src/config.js).
 npm install
 npm run dev                 # build in watch mode, serve on http://localhost:5180
 npm run build               # static site in dist/
-node --test test/*.test.mjs # tests (jsdom, no network)
+npm test                    # tests (jsdom, no network)
+npm run lint
 npm run live [cid]          # real node and download, no browser
 ```
 
@@ -49,8 +62,10 @@ npm run live [cid]          # real node and download, no browser
 
 `dist/` is a static site. [`ecosystem.config.cjs`](ecosystem.config.cjs)
 serves it with PM2 on port 8090, sending unknown paths to `index.html` so
-`cid.serey.io/<cid>` opens directly. Rebuild with `npm run build`; no restart
-is needed.
+`cid.serey.io/<cid>` opens directly. `npm run build` builds beside `dist/` and
+swaps it in whole, so a release needs no restart. The proxy in front should
+add `Content-Security-Policy: frame-ancestors 'none'` and
+`X-Content-Type-Options: nosniff`, which a page cannot set for itself.
 
 ## Credits
 
