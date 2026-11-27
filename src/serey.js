@@ -5,7 +5,7 @@ const NAME = /^[a-z0-9][a-z0-9.-]{1,31}$/;
 const PERMLINK = /^[a-z0-9][a-z0-9-]{0,255}$/i;
 
 // Community sites put a section before the post: chhay.serey.io/gallery/<account>/<permlink>, /video/..., and so on.
-const COMMUNITY_POST = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/(?!sereyexplorer\/|api\/)[a-z0-9-]+\/([^/?#\s]+)\/([^/?#\s]+)/i;
+const COMMUNITY_POST = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/(?!sereyexplorer\/|api\/|s5\/)[a-z0-9-]+\/([^/?#\s]+)\/([^/?#\s]+)/i;
 
 // Video pages name the post in the query: <name>.serey.io/video-component/watch?author=<account>&permalink=<permlink>.
 const QUERY_LINK = /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)*serey\.io\/[^?#\s]*\?([^#\s]+)/i;
@@ -60,7 +60,7 @@ export function postRows(media) {
   const seen = new Set();
   for (const m of Array.isArray(media) ? media : []) {
     if (!m || typeof m !== 'object') continue;
-    const name = KIND_NAMES[m.kind] || 'File';
+    const name = Object.hasOwn(KIND_NAMES, m.kind) ? KIND_NAMES[m.kind] : 'File';
     if (typeof m.s5_cid === 'string' && m.s5_cid && !seen.has(m.s5_cid)) {
       seen.add(m.s5_cid);
       rows.push({ cid: m.s5_cid, name, role: 'file', kind: m.kind });

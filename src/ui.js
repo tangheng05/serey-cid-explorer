@@ -19,7 +19,6 @@ export function h(tag, props, ...kids) {
 
 // replaceChildren/append turn an array into text, so lists are flattened first.
 export const fill = (parent, ...kids) => parent.replaceChildren(...kids.flat(Infinity).filter(Boolean));
-export const add = (parent, ...kids) => parent.append(...kids.flat(Infinity).filter(Boolean));
 
 // Stroke icons, drawn from fixed paths in this file.
 export const ICONS = {
@@ -30,7 +29,6 @@ export const ICONS = {
   file: ['M14 3v4a1 1 0 0 0 1 1h4', 'M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z', 'M11 14h1v4h1', 'M12 11h.01'],
   database: ['M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3z', 'M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6', 'M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'],
   server: ['M5 4h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M5 14h14a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2z', 'M7 7h.01', 'M7 17h.01'],
-  network: ['M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M12 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M9 6h6', 'M7.5 8.5l3 6.5', 'M16.5 8.5l-3 6.5'],
   hash: ['M5 9h14', 'M5 15h14', 'M11 4 7 20', 'M17 4l-4 16'],
   shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
   alert: ['M12 3 2 20h20z', 'M12 10v4', 'M12 17h.01'],
@@ -79,11 +77,17 @@ export function section(art, title, aside, ...body) {
 }
 
 export const withCopy = (text) => h('span', { class: 'value copyable' }, mono(text), copyButton(text));
-export const concat = (chunks) => {
-  const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+// The first bytes of a download kept in chunks: enough to tell what kind of file it is.
+export const headOf = (chunks, n = 64) => {
+  const head = new Uint8Array(n);
   let at = 0;
-  chunks.forEach((c) => { all.set(c, at); at += c.length; });
-  return all;
+  for (const c of chunks) {
+    const take = Math.min(c.length, n - at);
+    head.set(c.subarray(0, take), at);
+    at += take;
+    if (at === n) break;
+  }
+  return head.subarray(0, at);
 };
 
 // A storage location is an offer that lasts a while; the node hands out a fresh one when asked again.

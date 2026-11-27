@@ -2,8 +2,8 @@ import { fetchLocations } from './nodes.js';
 import { sniffImage, sniffVideo } from './verify.js';
 import { findCopies, fetchTx, arweaveUrl, isSereyWallet } from './arweave.js';
 import { fileSize, relativeTime } from './format.js';
-import { SEREY_NODE, OTHER_NODES, PREVIEW_MAX_BYTES, ARWEAVE_EXPLORER_URL } from './config.js';
-import { h, fill, icon, mono, row, pill, copyButton, withCopy, concat, expiryValue, section } from './ui.js';
+import { OTHER_NODES, PREVIEW_MAX_BYTES, ARWEAVE_EXPLORER_URL } from './config.js';
+import { h, fill, icon, mono, row, pill, copyButton, withCopy, headOf, expiryValue, section } from './ui.js';
 import { createCopy, copyRow, limiter, PLACES } from './copies.js';
 
 let blobUrls = [];
@@ -70,12 +70,13 @@ function kindName(type, isText) {
   return 'File';
 }
 
-export const problemCard = (art, title, ...text) => h('section', { class: 'card problem' }, h('div', { class: 'problem-icon' }, icon(art)), h('div', null, h('h2', null, title), ...text.filter(Boolean).map((t) => (t instanceof Node ? t : h('p', null, t)))));
+export const problemCard = (art, title, ...text) => h('section', { class: 'card problem', role: 'status' }, h('div', { class: 'problem-icon' }, icon(art)), h('div', null, h('h2', null, title), ...text.filter(Boolean).map((t) => (t instanceof Node ? t : h('p', null, t)))));
 
 // What Arweave says about a transaction, for the technical details.
 function arweaveRows(id, tx, full = true) {
   if (!tx) return [row('Transaction', withCopy(id)), row('Address', link(arweaveUrl(id)))];
-  const when = tx.time ? `${new Date(tx.time * 1000).toLocaleString()}, ${relativeTime(tx.time)}, in block ${tx.height.toLocaleString('en-US')}` : 'Not in a block yet';
+  const block = tx.height != null ? `, in block ${tx.height.toLocaleString('en-US')}` : '';
+  const when = tx.time ? `${new Date(tx.time * 1000).toLocaleString()}, ${relativeTime(tx.time)}${block}` : 'Not in a block yet';
   return [
     row('Transaction', withCopy(id)),
     tx.owner ? row('Uploaded by', h('span', { class: 'value copyable' }, mono(tx.owner), copyButton(tx.owner), isSereyWallet(tx.owner) ? pill('ok', "Serey's wallet") : pill('warn', 'Not Serey'))) : null,
@@ -118,7 +119,7 @@ export function techSections({ fp, cid, copies, tx, others, full }) {
         { class: 'loc' },
         loc.parts.length ? loc.parts.map((url) => row('Address', link(url))) : row('Address', 'The node has no https address for it'),
         full ? row('Kind', loc.type) : null,
-        loc.expiry ? row('Offer', expiryValue(loc.expiry, () => s5.locate())) : null,
+        loc.expiry ? row('Offer', expiryValue(loc.expiry, () => s5.refresh())) : null,
         full && loc.nodeId ? row('Node ID', mono(loc.nodeId)) : null,
       )),
       full && others ? [h('h4', { class: 'tech-sub' }, 'Other S5 nodes'), others.map(({ node, found }) => row(node.name, h('span', { class: 'value' }, found === null ? pill('warn', 'No answer') : found ? pill('ok', 'Also has this file') : pill('neutral', 'Does not have it'))))] : null,
@@ -129,9 +130,13 @@ export function techSections({ fp, cid, copies, tx, others, full }) {
 }
 
 // An Arweave upload with nothing to check it against: its details, and why.
-export function renderTx(out, tx) {
+export function renderTx(out, tx, why = {}) {
   out.append(
-    problemCard('file', 'This Arweave upload can’t be checked', 'It names no S5 file and carries no SHA-256, so its bytes have nothing to be compared with.'),
+    problemCard(
+      'file',
+      why.title || 'This Arweave upload can’t be checked',
+      why.text || 'It names no S5 file and carries no SHA-256, so its bytes have nothing to be compared with.',
+    ),
     h('section', { class: 'card tech-card' }, section('database', 'Arweave', null, h('div', { class: 'sect-body' }, arweaveRows(tx.id, tx)))),
   );
 }
@@ -161,7 +166,7 @@ export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
   const authorValue = h('dd');
   const authorFact = h('div', { class: 'fact', hidden: true }, h('dt', null, 'Posted by'), authorValue);
   let sniffed = '';
-  const verdict = h('h2', { class: 'verdict' });
+  const verdict = h('h2', { class: 'verdict', 'aria-live': 'polite' });
   const verdictSub = h('p', { class: 'verdict-sub' });
   const list = h('div', { class: 'copy-list' });
   const tech = h('div', { class: 'tech-body' });
@@ -233,6 +238,8 @@ export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
   function onChange(copy, progress) {
     if (progress) return;
     if (copy.state === 'ok' && !previewed) preview(copy.res);
+    // The preview holds its own copy; keeping these too would double a large file in memory.
+    if (copy.res) copy.res.kept = null;
     paint();
   }
 
@@ -245,15 +252,15 @@ export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
       fill(reading.querySelector('.reading-body'), readingView(post));
       return;
     }
-    if (!res.kept) return;
-    const bytes = concat(res.kept);
-    const type = sniffImage(bytes) || sniffVideo(bytes);
+    if (!res.kept || !res.kept.length) return;
+    const head = headOf(res.kept);
+    const type = sniffImage(head) || sniffVideo(head);
     if (!type) {
       dropMedia();
       return;
     }
     previewed = true;
-    const src = URL.createObjectURL(new Blob([bytes], { type }));
+    const src = URL.createObjectURL(new Blob(res.kept, { type }));
     blobUrls.push(src);
     media.classList.add('has-preview');
     fill(media, h('div', { class: 'preview' }, type.startsWith('image/')
@@ -264,7 +271,8 @@ export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
   }
 
   function paint() {
-    const author = tagOf(tx, 'Serey-Author');
+    // Tags are written by the uploader, so the author counts only from Serey's own wallet.
+    const author = tx && isSereyWallet(tx.owner) ? tagOf(tx, 'Serey-Author') : '';
     typeValue.textContent = kindName((tx && tx.type) || sniffed, isText);
     sizeValue.textContent = size ? fileSize(size) : 'Unknown';
     authorValue.textContent = author ? `@${author}` : '';
@@ -277,8 +285,11 @@ export function renderFile(out, { fp, cid, arweave, signal, isCurrent }) {
     let tone;
     let title;
     let sub;
-    if (real.some((c) => c.state === 'bad')) {
-      [tone, title, sub] = ['bad', 'A copy does not match', `The ${names(real.filter((c) => c.state === 'bad'))} copy is NOT this file: its fingerprint is different.`];
+    const storedBad = real.filter((c) => c.state === 'bad' && c.place !== 'local');
+    if (storedBad.length) {
+      [tone, title, sub] = ['bad', 'A copy does not match', `The ${names(storedBad)} copy is NOT this file: its fingerprint is different.`];
+    } else if (real.some((c) => c.state === 'bad')) {
+      [tone, title, sub] = ['warn', 'Your file is not this one', 'The file you picked has a different fingerprint. The stored copies are not affected.'];
     } else if (busy) {
       [tone, title, sub] = ['busy', 'Checking copies', 'Your browser downloads each copy and computes its fingerprint.'];
     } else if (ok.length && ok.length === real.length) {

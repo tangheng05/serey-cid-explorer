@@ -12,8 +12,9 @@ const isHttps = (u) => {
 export function cleanLocations(body) {
   const list = body && Array.isArray(body.locations) ? body.locations : [];
   return list
+    .filter((loc) => loc && typeof loc === 'object')
     .map((loc) => ({
-      type: TYPES[loc.type] || `Type ${loc.type}`,
+      type: Object.hasOwn(TYPES, loc.type) ? TYPES[loc.type] : `Type ${Number(loc.type) || '?'}`,
       parts: (Array.isArray(loc.parts) ? loc.parts : []).filter(isHttps),
       expiry: Number.isFinite(loc.expiry) ? loc.expiry : null,
       nodeId: typeof loc.nodeId === 'string' ? loc.nodeId : '',
@@ -26,5 +27,8 @@ export function cleanLocations(body) {
 export async function fetchLocations(node, key, { signal, fetchImpl = fetch } = {}) {
   const res = await fetchImpl(`${node.url}/s5/debug/storage_locations/${key}`, { signal });
   if (!res.ok) throw new Error(`${node.name} answered ${res.status}`);
-  return cleanLocations(await res.json());
+  const body = await res.json().catch(() => {
+    throw new Error(`${node.name} sent an answer this page cannot read`);
+  });
+  return cleanLocations(body);
 }

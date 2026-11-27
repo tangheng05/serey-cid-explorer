@@ -1,7 +1,7 @@
 import { fetchLocations } from './nodes.js';
 import { verifyUrl, verifyFile } from './verify.js';
 import { arweaveUrl, verifyText, TEXT_MAX_BYTES } from './arweave.js';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2';
 import { toHex } from './cid.js';
 import { fileSize } from './format.js';
 import { SEREY_NODE, AUTO_VERIFY_MAX_BYTES, CONFIRM_ABOVE_BYTES } from './config.js';
@@ -52,14 +52,12 @@ export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent 
     url: place === 'arweave' && arweaveId ? arweaveUrl(arweaveId) : null,
     host: place === 'arweave' && arweaveId ? 'arweave.net' : '',
     locations: [],
-    expiry: null,
-    nodeId: '',
     res: null,
     file: null,
     on(fn) { listeners.add(fn); },
-    // An Arweave copy found after the row was drawn.
     // How much a check of this copy downloads.
     size: () => bytes,
+    // An Arweave copy found after the row was drawn.
     attach(id, more) {
       copy.arweaveId = id;
       copy.url = arweaveUrl(id);
@@ -85,13 +83,21 @@ export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent 
         if (/ 404$/.test(e.message)) return copy.set('missing', `${SEREY_NODE.name} does not have this file. It may have been deleted.`);
         return copy.set('failed', `${SEREY_NODE.name} did not answer (${e.message}). Try again in a moment.`);
       }
-      const loc = copy.locations.find((l) => l.parts.length);
-      copy.url = loc ? loc.parts[0] : null;
-      copy.host = copy.url ? new URL(copy.url).host : '';
-      copy.expiry = loc ? loc.expiry : null;
-      copy.nodeId = loc ? loc.nodeId : '';
+      useLocation();
       if (!copy.url) return copy.set('missing', `${SEREY_NODE.name} does not have this file. It may have been deleted.`);
       return copy.auto();
+    },
+
+    // A fresh offer for an expired one; a check already done stands.
+    async refresh() {
+      if (place !== 's5') return;
+      try {
+        copy.locations = await fetchLocations(SEREY_NODE, cid.key, { signal });
+      } catch {
+        return;
+      }
+      useLocation();
+      copy.emit();
     },
 
     // Small files are checked straight away; a big one waits for a click.
@@ -114,15 +120,23 @@ export function createCopy({ place, fp, cid, arweaveId, size, signal, isCurrent 
         copy.set('checking');
         try {
           copy.res = await download();
-          copy.set(copy.res.ok ? 'ok' : 'bad', copy.res.ok ? '' : 'These bytes are not the file this fingerprint names.');
         } catch (e) {
           if ((signal && signal.aborted) || !isCurrent()) return;
           if (/ 404$/.test(e.message)) copy.set('missing', `${PLACES[place].name} does not have this file.`);
           else copy.set('failed', `${reason(e)}.`);
+          return;
         }
+        // Outside the try: a listener that throws must not turn a verified copy into a failed download.
+        copy.set(copy.res.ok ? 'ok' : 'bad', copy.res.ok ? '' : 'These bytes are not the file this fingerprint names.');
       });
     },
   };
+
+  function useLocation() {
+    const loc = copy.locations.find((l) => l.parts.length);
+    copy.url = loc ? loc.parts[0] : null;
+    copy.host = copy.url ? new URL(copy.url).host : '';
+  }
 
   const onProgress = (done) => {
     const pct = Math.min(100, Math.floor((done / Math.max(bytes, 1)) * 100));

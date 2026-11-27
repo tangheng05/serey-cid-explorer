@@ -1,5 +1,5 @@
 import { parseCid, fromHex } from './cid.js';
-import { fetchTx, textSha } from './arweave.js';
+import { fetchTx, textSha, isSereyWallet, TEXT_MAX_BYTES } from './arweave.js';
 import { parsePostLink, postUrl, fetchEpisode, episodeUrl } from './serey.js';
 import { h, external, paintExpiry } from './ui.js';
 import { classify, fingerprintOf } from './resolve.js';
@@ -35,10 +35,29 @@ async function openArweave(id, ctx) {
   const cid = parseCid(tx.s5Cid);
   const sha = textSha(tx);
   const arweave = { id, tx };
-  if (cid.ok) renderFile(out, { ...ctx, fp: fingerprintOf(cid), cid, arweave });
-  else if (sha) renderFile(out, { ...ctx, fp: { kind: 'sha256', hash: fromHex(sha), hashHex: sha, size: tx.size || 0 }, arweave });
-  else renderTx(out, tx);
+  // Anyone can upload with Serey's tag names; only Serey's wallet makes them mean something.
+  if (!cid.ok && !sha) {
+    renderTx(out, tx);
+  } else if (!isSereyWallet(tx.owner)) {
+    renderTx(out, tx, {
+      title: 'This upload is not from Serey',
+      text: cid.ok
+        ? 'Another wallet uploaded it, so its tags prove nothing. Paste the S5 ID it names to check that file itself.'
+        : 'Another wallet uploaded it, so its tags prove nothing about a Serey file.',
+    });
+  } else if (cid.ok) {
+    renderFile(out, { ...ctx, fp: fingerprintOf(cid), cid, arweave });
+  } else if (sha && (tx.size || 0) <= TEXT_MAX_BYTES) {
+    renderFile(out, { ...ctx, fp: { kind: 'sha256', hash: fromHex(sha), hashHex: sha, size: tx.size || 0 }, arweave });
+  } else {
+    renderTx(out, tx);
+  }
 }
+
+// A page that failed to draw says so instead of spinning forever.
+const crashed = (ctx) => () => {
+  if (ctx.isCurrent()) out.replaceChildren(problemCard('alert', 'Something went wrong', 'This page could not read the answer it got. Try again in a moment.'));
+};
 
 // An episode link names a number; Serey says whose episode it is, and its files are listed like a post's.
 async function openEpisode(id, ctx) {
@@ -77,8 +96,8 @@ function render(value) {
   const ctx = { signal: controller.signal, isCurrent: () => gen === generation };
 
   if (what.kind === 'post') renderPost(out, what.post, ctx);
-  else if (what.kind === 'episode') openEpisode(what.episode, ctx);
-  else if (what.kind === 'arweave') openArweave(what.arweaveId, ctx);
+  else if (what.kind === 'episode') openEpisode(what.episode, ctx).catch(crashed(ctx));
+  else if (what.kind === 'arweave') openArweave(what.arweaveId, ctx).catch(crashed(ctx));
   else if (what.kind === 'cid') renderFile(out, { ...ctx, fp: fingerprintOf(what.cid), cid: what.cid });
   else if (what.kind === 'invalid') {
     const extra = what.cid.kind === 'ipfs' ? h('p', null, external(`https://cid.ipfs.tech/#${encodeURIComponent(what.cid.ipfs)}`, 'Open it in the IPFS CID inspector')) : null;
@@ -95,11 +114,11 @@ const onScroll = () => top.classList.toggle('scrolled', window.scrollY > 4);
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
-
 // A CID arrives as cid.serey.io/<cid> (the link from the Serey Explorer) or, from older links, #<cid>.
 // A post opens as cid.serey.io/post/<account>/<permlink> and an episode as /podcast/<number>; the box then shows its Serey link.
 function fromUrl() {
-  const raw = window.location.hash.slice(1) || window.location.pathname.slice(1);
+  const path = window.location.pathname === '/index.html' ? '' : window.location.pathname.slice(1);
+  const raw = window.location.hash.slice(1) || path;
   if (raw.startsWith('post/')) {
     const post = parsePostLink(`/${raw}`);
     return post ? postUrl(post) : '';
