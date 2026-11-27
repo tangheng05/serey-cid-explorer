@@ -12,3 +12,11 @@ test('what was pasted is told apart before anything is asked', () => {
   assert.strictEqual(kind('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG'), 'invalid');
   assert.strictEqual(kind('hello'), 'invalid');
 });
+
+test('links that carry an ID in their path open that ID', () => {
+  const cid = 'z2H72Rjmp9QkiGfccgpNhFPWN1F8DF3tWCcRjGZfi1aGYAVZK1qK';
+  assert.strictEqual(classify(`https://cid.serey.io/${cid}`).kind, 'cid');
+  assert.strictEqual(classify(`https://cid.serey.io/${'A'.repeat(43)}`).kind, 'arweave');
+  assert.strictEqual(classify(`https://s5.serey.io/s5/blob/${cid}`).kind, 'cid');
+  assert.strictEqual(classify('https://cid.serey.io/post/chhaylin/some-post').kind, 'post');
+});

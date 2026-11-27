@@ -107,3 +107,18 @@ test('compare reports hash and size separately', () => {
     { ok: false, hashOk: true, sizeOk: false },
   );
 });
+
+test('a download longer than the CID says is cut off, not read to the end', async () => {
+  const data = bytesOf(1000);
+  let pulled = 0;
+  const endless = new ReadableStream({
+    pull(controller) {
+      pulled += 1;
+      controller.enqueue(data);
+    },
+  });
+  const got = await hashStream(endless, { limit: 1000 });
+  assert.ok(got.bytes > 1000 && got.bytes <= 2000, 'it stops just past the expected size');
+  assert.ok(pulled < 5);
+  assert.strictEqual(compare(expectedFor(data), got).ok, false);
+});

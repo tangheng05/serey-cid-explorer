@@ -4,9 +4,10 @@ import { equalBytes, toHex } from './cid.js';
 /*
 | Hashes a stream of bytes as it arrives, so a multi-gigabyte file never sits
 | in memory. `keep` > 0 also collects the bytes (for a preview) while they stay
-| under that many; it is dropped the moment they go over.
+| under that many; it is dropped the moment they go over. Past `limit` bytes
+| the download stops: it can no longer match, so the rest is never fetched.
 */
-export async function hashStream(body, { onProgress, signal, keep = 0 } = {}) {
+export async function hashStream(body, { onProgress, signal, keep = 0, limit = Infinity } = {}) {
   const reader = body.getReader();
   const hasher = blake3.create({});
   let bytes = 0;
@@ -23,6 +24,11 @@ export async function hashStream(body, { onProgress, signal, keep = 0 } = {}) {
         else kept.push(value);
       }
       if (onProgress) onProgress(bytes);
+      if (bytes > limit) {
+        kept = null;
+        await reader.cancel().catch(() => {});
+        break;
+      }
     }
   } finally {
     reader.releaseLock();
@@ -42,12 +48,12 @@ export async function verifyUrl(url, expected, opts = {}) {
   const res = await fetchImpl(url, { signal: opts.signal });
   if (!res.ok) throw new Error(`The file server answered ${res.status}`);
   if (!res.body) throw new Error('This browser cannot stream the download');
-  const got = await hashStream(res.body, opts);
+  const got = await hashStream(res.body, { ...opts, limit: expected.size });
   return { ...compare(expected, got), kept: got.kept };
 }
 
 export async function verifyFile(file, expected, opts = {}) {
-  const got = await hashStream(file.stream(), opts);
+  const got = await hashStream(file.stream(), { ...opts, limit: expected.size });
   return { ...compare(expected, got), kept: got.kept };
 }
 
@@ -56,7 +62,10 @@ export async function verifyFile(file, expected, opts = {}) {
 export function sniffVideo(bytes) {
   const b = bytes;
   if (b.length > 12 && String.fromCharCode(...b.slice(4, 8)) === 'ftyp') {
-    return String.fromCharCode(...b.slice(8, 12)) === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+    const brand = String.fromCharCode(...b.slice(8, 12));
+    // AVIF and HEIC pictures share MP4's container.
+    if (['avif', 'avis', 'heic', 'heix', 'mif1', 'msf1'].includes(brand)) return null;
+    return brand === 'qt  ' ? 'video/quicktime' : 'video/mp4';
   }
   if (b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'video/webm';
   return null;

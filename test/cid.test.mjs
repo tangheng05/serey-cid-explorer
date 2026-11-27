@@ -90,3 +90,11 @@ test('a hash that is too short or a size that is absurdly long is invalid', () =
   const huge = `z${b58encode(Uint8Array.from([0x26, 0x1f, ...new Array(32).fill(7), 1, 1, 1, 1, 1, 1, 1, 1]))}`;
   assert.strictEqual(parseCid(huge).kind, 'invalid');
 });
+
+test('only the one canonical form of a CID is accepted', () => {
+  const r = parseCid(CID_A);
+  const bytes = b58decode(r.cid.slice(1));
+  const padded = `z${b58encode(Uint8Array.from([...bytes, 0]))}`;
+  assert.strictEqual(parseCid(padded).ok, false, 'a trailing zero byte in the size is refused');
+  assert.strictEqual(parseCid(`z${'2'.repeat(5000)}`).ok, false, 'an absurdly long input is refused before decoding');
+});

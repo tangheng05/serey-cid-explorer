@@ -1,6 +1,6 @@
-// S5 content IDs. Layout checked against a live s5-dart node (see
-// deploy/s5/README.md in the storage API): multibase prefix, then
-// 0x26 (raw file) || 0x1f (BLAKE3) || 32-byte hash || size, little endian.
+// S5 content IDs. Layout checked against a live s5-dart node: multibase
+// prefix, then 0x26 (raw file) || 0x1f (BLAKE3) || 32-byte hash || size,
+// little endian with no trailing zero bytes.
 export const TYPE_RAW = 0x26;
 export const HASH_BLAKE3 = 0x1f;
 
@@ -139,8 +139,10 @@ export function parseCid(input) {
     return { ok: false, kind: 'ipfs', message: 'This looks like an IPFS CID, not an S5 one.', ipfs: main };
   }
 
+  // A file CID is under 70 characters in any form; base58 decoding grows quadratically with length.
+  if (main.length > 100) return { ok: false, kind: 'invalid', message: 'Not a CID: it is far too long.' };
   const decoders = { z: b58decode, b: b32decode, u: b64urlDecode };
-  const decode = decoders[main[0]];
+  const decode = Object.hasOwn(decoders, main[0]) ? decoders[main[0]] : null;
   if (!decode) return { ok: false, kind: 'invalid', message: 'Not a CID. S5 CIDs start with z, b or u.' };
   const bytes = decode(main.slice(1));
   if (!bytes || bytes.length < 2) return { ok: false, kind: 'invalid', message: 'Not a valid CID: it has characters that do not belong.' };
@@ -155,13 +157,15 @@ export function parseCid(input) {
   if (bytes[1] !== HASH_BLAKE3) {
     return { ok: false, kind: 'other-hash', message: `Unsupported hash function 0x${bytes[1].toString(16)}. S5 file CIDs use BLAKE3 (0x1f).` };
   }
-  if (bytes.length < 34 || bytes.length > 34 + 7) {
+  // A trailing zero byte would let two different strings name the same file.
+  if (bytes.length < 34 || bytes.length > 34 + 7 || (bytes.length > 34 && bytes[bytes.length - 1] === 0)) {
     return { ok: false, kind: 'invalid', message: 'Not a valid file CID: the length is wrong.' };
   }
 
   const hash = bytes.slice(2, 34);
   let size = 0;
   for (let i = bytes.length - 1; i >= 34; i -= 1) size = size * 256 + bytes[i];
+  if (!Number.isSafeInteger(size)) return { ok: false, kind: 'invalid', message: 'Not a valid file CID: the size is impossible.' };
 
   return {
     ok: true,

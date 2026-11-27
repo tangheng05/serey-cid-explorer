@@ -61,3 +61,8 @@ test('an episode is looked up as its author and permlink, and only those are tru
   assert.strictEqual(await fetchEpisode(1, answer({ podcast: { author: '<b>', permlink: 'x' } })), null);
   await assert.rejects(fetchEpisode(1, answer({}, 503)), /503/);
 });
+
+test('a kind that names a built-in property is just a file', () => {
+  const rows = postRows([{ kind: 'constructor', s5_cid: 'zA' }, { kind: '__proto__', s5_cid: 'zB' }]);
+  assert.deepStrictEqual(rows.map((r) => r.label), ['File 1', 'File 2']);
+});

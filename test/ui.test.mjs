@@ -220,3 +220,13 @@ test('the examples fill the box and open their page', async () => {
   page.doc.querySelector('[data-example]').click();
   assert.ok(page.doc.getElementById('cid-input').value.startsWith('https://serey.io/authors/chhaylin/'));
 });
+
+test('an Arweave upload from another wallet is never shown as Serey’s', async () => {
+  const text = '{"v":2,"title":"<p>Official notice</p>","body":"<p>Send funds here</p>"}';
+  const sha = createHash('sha256').update(text).digest('hex');
+  const tx = { id: AR, owner: { address: 'X'.repeat(43) }, data: { size: String(text.length) }, tags: [{ name: 'Content-SHA256', value: sha }, { name: 'Serey-Author', value: 'serey' }] };
+  const page = await open(network({ txs: { [AR]: tx }, arweaveFiles: { [AR]: text } }), { path: AR });
+  await until(() => page.text().includes('not from Serey'), 'the upload is called out');
+  assert.ok(!page.text().includes('Send funds here'), 'its text is not shown as a post');
+  assert.ok(!page.text().includes('@serey'), 'its author tag is not shown');
+});

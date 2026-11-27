@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2';
 import { ARWEAVE_GATEWAY, ARWEAVE_GRAPHQL, SEREY_ARWEAVE_OWNERS } from './config.js';
 import { toHex } from './cid.js';
 
@@ -95,6 +95,9 @@ export const TEXT_MAX_BYTES = 1024 * 1024;
 export async function verifyText(id, expected, { signal, fetchImpl = fetch } = {}) {
   const res = await fetchImpl(arweaveUrl(id), { signal });
   if (!res.ok) throw new Error(`Arweave answered ${res.status}`);
+  if (Number(res.headers && res.headers.get && res.headers.get('content-length')) > TEXT_MAX_BYTES) {
+    throw new Error('This file is too big to be a post text');
+  }
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes.length > TEXT_MAX_BYTES) throw new Error('This file is too big to be a post text');
   const gotHex = toHex(sha256(bytes));
